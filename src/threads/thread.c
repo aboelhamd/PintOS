@@ -100,6 +100,17 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 }
 
+void
+get_ready_list (void)
+{
+  print_list (&ready_list);
+}
+void
+get_all_list (void)
+{
+  print_list (&all_list);
+}
+
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void

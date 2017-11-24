@@ -31,7 +31,6 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-bool less (const struct list_elem *e1,const struct list_elem *e2,void *aux);
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -100,14 +99,13 @@ sema_try_down (struct semaphore *sema)
 
   return success;
 }
-bool 
+static bool 
 less (const struct list_elem *e1,
-                             const struct list_elem *e2,
-                             void *aux)
+        const struct list_elem *e2,void *aux)
 {
   struct thread *t1 = list_entry(e1,struct thread,elem);
   struct thread *t2 = list_entry(e2,struct thread,elem);
-  printf("%lld t1.waitTime %d t1.priority %lld t2.waitTime\n",t1->wake_time,t1->priority,t2->wake_time);
+  // printf("%lld t1.waitTime %d t1.priority %lld t2.waitTime\n",t1->wake_time,t1->priority,t2->wake_time);
   return (t1->wake_time < t2->wake_time) 
   || ((t1->wake_time == t2->wake_time)&&(t1->priority > t2->priority)); 
 }
@@ -117,11 +115,11 @@ sema_sleep_down (struct semaphore *sema)
   enum intr_level old_level;
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
       list_insert_ordered (&sema->waiters, &thread_current ()->elem,less,NULL);
+      printf("thread: %s is inserted \n", thread_current ()->name);
       thread_block ();
     }
   sema->value--;
@@ -137,7 +135,6 @@ sema_up (struct semaphore *sema)
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
-
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
@@ -152,13 +149,7 @@ sema_up (struct semaphore *sema)
 void
 sema_sleep_up (struct semaphore *sema,int64_t curr_ticks) 
 {
-  enum intr_level old_level;
-
   ASSERT (sema != NULL);
-
-  old_level = intr_disable ();
-
-  //traverse the waiting list
   struct list_elem *cur_elem = list_begin (&sema->waiters);
   struct thread *cur_thread = list_entry (cur_elem, struct thread, elem);
   if(cur_thread->wake_time <= curr_ticks){
@@ -166,11 +157,10 @@ sema_sleep_up (struct semaphore *sema,int64_t curr_ticks)
     list_pop_front(&sema->waiters);
     sema->value++;
   }
-
-  intr_set_level (old_level);
 }
 
-static void sema_test_helper (void *sema_);
+static void 
+sema_test_helper (void *sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
    between a pair of threads.  Insert calls to printf() to see

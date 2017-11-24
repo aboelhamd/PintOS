@@ -1,6 +1,7 @@
 #include "list.h"
+#include <stdio.h>
 #include "../debug.h"
-
+#include "threads/thread.h"
 /* Our doubly linked lists have two header elements: the "head"
    just before the first element and the "tail" just after the
    last element.  The `prev' link of the front header is null, as
@@ -81,6 +82,8 @@ list_begin (struct list *list)
 struct list_elem *
 list_next (struct list_elem *elem)
 {
+  if(!is_head (elem) && !is_interior (elem))
+    printf("error from thread: %s\n", thread_current ()->name);
   ASSERT (is_head (elem) || is_interior (elem));
   return elem->next;
 }
@@ -310,6 +313,20 @@ bool
 list_empty (struct list *list)
 {
   return list_begin (list) == list_end (list);
+}
+
+void
+print_list (struct list *list)
+{
+  struct list_elem *e;
+  printf("printing list\n");
+  ASSERT(!list_empty (list));
+  for (e = list_begin (list); e != list_end (list); e = e->prev)
+  {
+    struct thread *t = list_entry(e,struct thread,elem);
+    printf("elem>> %s, ", t->name);
+  }
+  printf("\nfinish printing list\n");
 }
 
 /* Swaps the `struct list_elem *'s that A and B point to. */

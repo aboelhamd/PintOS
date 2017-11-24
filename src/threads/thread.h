@@ -139,4 +139,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/*for debuging purposes*/
+void get_all_list (void);
+void get_ready_list (void);
+
 #endif /* threads/thread.h */
