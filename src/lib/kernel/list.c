@@ -1,5 +1,7 @@
 #include "list.h"
 #include "../debug.h"
+#include <stdio.h>
+#include "threads/thread.h"
 
 /* Our doubly linked lists have two header elements: the "head"
    just before the first element and the "tail" just after the
@@ -81,6 +83,11 @@ list_begin (struct list *list)
 struct list_elem *
 list_next (struct list_elem *elem)
 {
+  if (!is_head (elem) && !is_interior (elem))
+  {
+    struct thread *t = list_entry (elem,struct thread,elem);
+    printf("%s is the problem ,, %s\n", thread_current ()->name, t->name);
+  }
   ASSERT (is_head (elem) || is_interior (elem));
   return elem->next;
 }
@@ -522,3 +529,19 @@ list_min (struct list *list, list_less_func *less, void *aux)
     }
   return min;
 }
+
+/**/
+void
+list_print (struct list *list)
+{
+  struct list_elem *e;
+  printf("printing list\n");
+  ASSERT(!list_empty (list));
+  for (e = list_begin (list); e != list_end (list); e = e->prev)
+  {
+    struct thread *t = list_entry(e,struct thread,elem);
+    printf("elem>> %d, ", t->priority);
+  }
+  printf("\nfinish printing list\n");
+}
+

@@ -30,6 +30,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/*variable of Alarm Clock Req.*/
+static struct list sleeping_list;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +40,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&sleeping_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +88,28 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
-void
-timer_sleep (int64_t ticks) 
+/* Sorting function. */
+static bool 
+less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
 {
-  int64_t start = timer_ticks ();
+  struct thread *t1 = list_entry(e1,struct thread,elem);
+  struct thread *t2 = list_entry(e2,struct thread,elem);
+  return (t1->wake_time < t2->wake_time) 
+  || ((t1->wake_time == t2->wake_time)&&(t1->priority > t2->priority)); 
+}
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+/* Sleeps for approximately TICKS timer ticks.*/
+void
+timer_sleep (int64_t _ticks) 
+{
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  thread_current ()->wake_time = _ticks+ticks;
+  printf("%s is sleeping for %lld ticks at time %lld\n", thread_current ()->name,_ticks,ticks);
+  list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -166,12 +182,27 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler. interupt is disabled.*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  if(list_size (&sleeping_list))
+  {
+    struct list_elem *cur_elem = list_begin (&sleeping_list);
+    struct thread *cur_thread = list_entry (cur_elem, struct thread, elem);
+    if(cur_thread->wake_time <= ticks){
+      // print_ready_threads ();
+      printf("%s is running now\n", thread_current ()->name);
+      printf("%s is waking up at %lld\n", cur_thread->name ,ticks);
+      thread_unblock(cur_thread);
+      list_pop_front(&sleeping_list);
+      // print_all_threads ();
+      // print_ready_threads ();
+      printf("%s is still running now\n", thread_current ()->name);
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
