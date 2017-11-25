@@ -532,15 +532,20 @@ list_min (struct list *list, list_less_func *less, void *aux)
 
 /**/
 void
-list_print (struct list *list)
+list_print (struct list *list,char* name)
 {
   struct list_elem *e;
-  printf("printing list\n");
-  ASSERT(!list_empty (list));
-  for (e = list_begin (list); e != list_end (list); e = e->prev)
+  printf("printing %s\n",name);
+  // ASSERT(!list_empty (list));
+  if (list_empty (list))
+  {
+    printf("empty list\n");
+    return;
+  }
+  for (e = list_begin (list); e != list_end (list); e = e->next)
   {
     struct thread *t = list_entry(e,struct thread,elem);
-    printf("elem>> %d, ", t->priority);
+    printf("elem>> %s, ", t->name);
   }
   printf("\nfinish printing list\n");
 }

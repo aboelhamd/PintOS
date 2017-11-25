@@ -75,15 +75,15 @@ static tid_t allocate_tid (void);
 void
 print_all_threads (void)
 {
-  // list_print (&all_list);
-  printf("all thread size =%d\n", list_size (&all_list));
+  list_print (&all_list,"all_list");
+  // printf("all thread size =%d\n", list_size (&all_list));
 }
 
 void
 print_ready_threads (void)
 {
-  // list_print (&ready_list);
-  printf("ready thread size =%d\n",list_size (&ready_list) );
+  list_print (&ready_list,"ready_list");
+  // printf("ready thread size =%d\n",list_size (&ready_list) );
 }
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -254,17 +254,17 @@ void
 thread_unblock (struct thread *t) 
 {
   enum intr_level old_level;
-  if(t == NULL){
-    printf("%s\n", "homzksasdfasdf");
-  }else {
-    printf("%s %d \n", t->name , t->magic == THREAD_MAGIC);
-  }
+  // if(t == NULL){
+  //   printf("%s\n", "homzksasdfasdf");
+  // }else {
+  //   printf("%s %d \n", t->name , t->magic == THREAD_MAGIC);
+  // }
   ASSERT (is_thread (t));
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
-  printf("%s is in ready list %d\n", t->name ,list_size (&ready_list));
+  // printf("%s is in ready list %d\n", t->name ,list_size (&ready_list));
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
