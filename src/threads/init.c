@@ -117,6 +117,9 @@ main (void)
 
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
+#ifdef DEBUG
+  printf("i am in main %s pr = %d\n", thread_current ()->name ,thread_current ()->priority);
+#endif
   serial_init_queue ();
   timer_calibrate ();
 

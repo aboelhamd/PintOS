@@ -32,6 +32,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -101,6 +104,16 @@ sema_try_down (struct semaphore *sema)
   return success;
 }
 
+/* Sorting function. */
+static bool 
+less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
+{
+  struct thread *t1 = list_entry(e1,struct thread,elem);
+  struct thread *t2 = list_entry(e2,struct thread,elem);
+  return (t1->priority < t2->priority); 
+}
+
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -113,9 +126,17 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
+
+  // if(thread_current()->before_donate_priority > -1){
+  //   thread_current()->priority = thread_current()->before_donate_priority;
+  //   thread_current()->before_donate_priority = -1;
+  // }
+
+  if (!list_empty (&sema->waiters))
+      thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
+    // thread_unblock (list_entry (list_remove (list_max(&sema->waiters,less,NULL)),
+    //                             struct thread, elem));
   sema->value++;
   intr_set_level (old_level);
 }

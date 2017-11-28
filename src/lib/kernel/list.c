@@ -530,7 +530,7 @@ list_min (struct list *list, list_less_func *less, void *aux)
   return min;
 }
 
-/**/
+/*printing list except all_list in threads*/
 void
 list_print (struct list *list,char* name)
 {
@@ -550,3 +550,21 @@ list_print (struct list *list,char* name)
   printf("\nfinish printing list\n");
 }
 
+/*printing all_list in threads*/
+void
+all_list_print (struct list *list,char* name)
+{
+  struct list_elem *e;
+  printf("printing %s\n",name);
+  if (list_empty (list))
+  {
+    printf("empty list\n");
+    return;
+  }
+  for (e = list_begin (list); e != list_end (list); e = e->next)
+  {
+    struct thread *t = list_entry(e,struct thread,allelem);
+    printf("elem>> %s, ", t->name);
+  }
+  printf("\nfinish printing list\n");
+}

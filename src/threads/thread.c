@@ -68,22 +68,27 @@ static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
+static struct thread* highest_piriority_thread (void);
+static struct thread* bsd (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-
+static bool less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED);
 
 void
 print_all_threads (void)
 {
-  list_print (&all_list,"all_list");
-  // printf("all thread size =%d\n", list_size (&all_list));
+#ifdef DEBUG
+  all_list_print (&all_list,"all_list");
+#endif
 }
 
 void
 print_ready_threads (void)
 {
+#ifdef DEBUG
   list_print (&ready_list,"ready_list");
-  // printf("ready thread size =%d\n",list_size (&ready_list) );
+#endif
 }
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -237,7 +242,9 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
+#ifdef DEBUG
+  // printf("%s i am blocking\n", thread_current ()->name);
+#endif
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
@@ -254,18 +261,24 @@ void
 thread_unblock (struct thread *t) 
 {
   enum intr_level old_level;
-  // if(t == NULL){
-  //   printf("%s\n", "homzksasdfasdf");
-  // }else {
-  //   printf("%s %d \n", t->name , t->magic == THREAD_MAGIC);
-  // }
   ASSERT (is_thread (t));
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
-  // printf("%s is in ready list %d\n", t->name ,list_size (&ready_list));
   t->status = THREAD_READY;
+#ifdef DEBUG
+    printf("%s pr = %d is now unblock and the thread_current is %s pr = %d\n"
+      ,t->name,t->priority,thread_current ()->name,thread_current ()->priority);
+#endif
+  if (thread_current ()!= idle_thread && thread_current ()->priority < t->priority)
+  {
+#ifdef DEBUG
+    printf("yielding current thread\n");
+#endif
+    thread_yield ();
+  }
+
   intr_set_level (old_level);
 }
 
@@ -290,6 +303,7 @@ thread_current (void)
      of stack, so a few big automatic arrays or moderate
      recursion can cause stack overflow. */
   ASSERT (is_thread (t));
+  // debug_backtrace ();
   ASSERT (t->status == THREAD_RUNNING);
 
   return t;
@@ -363,6 +377,13 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  enum intr_level old_level = intr_disable ();
+  struct list_elem *max_elem = list_max (&ready_list,less,NULL);
+  struct thread *t = list_entry (max_elem,struct thread,elem);
+  if(t->priority > new_priority){
+    thread_yield ();
+  }
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -417,8 +438,13 @@ idle (void *idle_started_ UNUSED)
 {
   struct semaphore *idle_started = idle_started_;
   idle_thread = thread_current ();
+#ifdef DEBUG
+  printf("i am idle AHHAHAHAAHAHAHHAHAHHAHA\n");
+#endif
   sema_up (idle_started);
-
+#ifdef DEBUG
+  printf("where i am asdFASDFASDFASdFasFasFasdf\n");
+#endif
   for (;;) 
     {
       /* Let someone else run. */
@@ -487,6 +513,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->before_donate_priority = -1;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 }
@@ -504,6 +531,39 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+/* Sorting threads according their priorities.*/
+static bool 
+less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
+{
+  struct thread *t1 = list_entry(e1,struct thread,elem);
+  struct thread *t2 = list_entry(e2,struct thread,elem);
+  return (t1->priority < t2->priority); 
+}
+
+static struct thread*
+highest_piriority_thread (void)
+{
+  struct list_elem *max_elem = list_max (&ready_list,less,NULL);
+  struct thread *t = list_entry (max_elem,struct thread,elem);
+  list_remove (max_elem);
+#ifdef DEBUG
+  enum thread_status old_status = running_thread ()->status;
+  running_thread ()->status = THREAD_RUNNING;
+  print_ready_threads ();
+  printf("%s will run now\n", t->name);
+  running_thread ()->status = old_status;
+#endif
+  return t;
+}
+
+static struct thread*
+bsd (void)
+{
+  //TOBE implemented for req3.
+  return NULL;
+}
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -515,7 +575,13 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  {
+    if (!thread_mlfqs)
+      return highest_piriority_thread ();
+    else
+      return bsd ();
+    // return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page

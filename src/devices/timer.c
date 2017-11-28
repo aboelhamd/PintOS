@@ -88,7 +88,7 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sorting function. */
+/* Sort threads according their waking time and priorities.*/
 static bool 
 less (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED)
@@ -108,9 +108,7 @@ timer_sleep (int64_t _ticks)
   enum intr_level old_level;
   old_level = intr_disable ();
   thread_current ()->wake_time = _ticks+start;
-  // printf("%s is sleeping for %lld ticks at time %lld\n", thread_current ()->name,_ticks,start);
   list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
-  // list_print (&sleeping_list,"sleeping_list");
   thread_block ();
   intr_set_level (old_level);
 }
@@ -195,31 +193,13 @@ timer_interrupt (struct intr_frame *args UNUSED)
   {
     struct list_elem *cur_elem = list_begin (&sleeping_list);
     struct thread *cur_thread = list_entry (cur_elem, struct thread, elem);
-    // if(cur_thread->wake_time <= ticks){
-      // print_ready_threads ();
-    //   list_pop_front(&sleeping_list);
-    //   struct list_elem *next_elem = list_begin (&sleeping_list);
-    //   while(next_elem ->wake_time <= ticks){
-    //     list_pop_front(&sleeping_list);
-    //     next_elem = list_begin (&sleeping_list);
-    //   }
-    //   // printf("%s is running now\n", thread_current ()->name);
-    //   // printf("%s is waking up at %lld\n", cur_thread->name ,ticks);
-    //   thread_unblock(cur_thread);
-    //   // print_ready_threads ();
-    //   // list_print (&sleeping_list,"sleeping_list");
-    //   // list_print (&sleeping_list,"sleeping_list");
-    //   // print_all_threads ();
-    //   // print_ready_threads ();
-    // }
-
+    
     while (cur_thread->wake_time <= ticks)
     {
       list_pop_front(&sleeping_list);
       thread_unblock(cur_thread);
       cur_elem = list_begin (&sleeping_list);
       cur_thread = list_entry (cur_elem, struct thread, elem);
-
     }
   }
 }
