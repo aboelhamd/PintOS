@@ -92,7 +92,8 @@ struct thread
                                             highest priority donated so far). */
     int before_donate_priority;         /* Priority before donation. */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    struct lock* acquired_lock;         /* The Lock which this thread is waiting for.*/
+    
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wake_time;                  /* time in which the sleeping thread will wake*/

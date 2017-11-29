@@ -86,9 +86,9 @@ print_all_threads (void)
 void
 print_ready_threads (void)
 {
-#ifdef DEBUG
+// #ifdef DEBUG
   list_print (&ready_list,"ready_list");
-#endif
+// #endif
 }
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -243,7 +243,7 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 #ifdef DEBUG
-  // printf("%s i am blocking\n", thread_current ()->name);
+  printf("%s i am blocking\n", thread_current ()->name);
 #endif
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
@@ -270,11 +270,12 @@ thread_unblock (struct thread *t)
 #ifdef DEBUG
     printf("%s pr = %d is now unblock and the thread_current is %s pr = %d\n"
       ,t->name,t->priority,thread_current ()->name,thread_current ()->priority);
+    // print_ready_threads ();
 #endif
   if (thread_current ()!= idle_thread && thread_current ()->priority < t->priority)
   {
 #ifdef DEBUG
-    printf("yielding current thread\n");
+    printf("yielding current thread %s to %s\n",thread_current ()->name,t->name);
 #endif
     thread_yield ();
   }
@@ -321,8 +322,8 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+  // printf("%s is exit\n",thread_current()->name );
   ASSERT (!intr_context ());
-
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -342,16 +343,18 @@ thread_exit (void)
 void
 thread_yield (void) 
 {
+  // printf("%s yielding\n",thread_current ()->name );
   struct thread *cur = thread_current ();
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
-
+  // printf("%s is yielding cpu \n", cur->name);
   old_level = intr_disable ();
   if (cur != idle_thread) 
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
+  // printf("%s has the cpu\n", thread_current ()->name);
   intr_set_level (old_level);
 }
 
@@ -439,11 +442,11 @@ idle (void *idle_started_ UNUSED)
   struct semaphore *idle_started = idle_started_;
   idle_thread = thread_current ();
 #ifdef DEBUG
-  printf("i am idle AHHAHAHAAHAHAHHAHAHHAHA\n");
+  // printf("i am idle AHHAHAHAAHAHAHHAHAHHAHA\n");
 #endif
   sema_up (idle_started);
 #ifdef DEBUG
-  printf("where i am asdFASDFASDFASdFasFasFasdf\n");
+  // printf("where i am asdFASDFASDFASdFasFasFasdf\n");
 #endif
   for (;;) 
     {
@@ -514,6 +517,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->before_donate_priority = -1;
+  t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 }
@@ -546,14 +550,14 @@ highest_piriority_thread (void)
 {
   struct list_elem *max_elem = list_max (&ready_list,less,NULL);
   struct thread *t = list_entry (max_elem,struct thread,elem);
-  list_remove (max_elem);
 #ifdef DEBUG
   enum thread_status old_status = running_thread ()->status;
   running_thread ()->status = THREAD_RUNNING;
   print_ready_threads ();
-  printf("%s will run now\n", t->name);
+  printf("%s will run now and %s is running_thread\n", t->name,running_thread ()->name);
   running_thread ()->status = old_status;
 #endif
+  list_remove (max_elem);
   return t;
 }
 
@@ -637,20 +641,32 @@ thread_schedule_tail (struct thread *prev)
 
    It's not safe to call printf() until thread_schedule_tail()
    has completed. */
+bool flage = false;
 static void
 schedule (void) 
 {
+  // if(flage){
+  //   enum thread_status old_status = running_thread ()->status;
+  //   running_thread ()->status = THREAD_RUNNING;
+  //   printf("I AM LEAVING \n");
+  //   debug_backtrace ();
+  //   running_thread ()->status = old_status;
+  // }
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
-
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
-
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+  // printf("the REAL RUNNING THREAD IS  %s ov %d\n", thread_current ()->name,thread_current ()->priority);
+  // if(!strcmp (thread_current ()->name , "acquire2")){
+  //   flage = 1;
+  // }else{
+  //   flage = 0;
+  // }
 }
 
 /* Returns a tid to use for a new thread. */

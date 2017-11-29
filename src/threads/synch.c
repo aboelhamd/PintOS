@@ -34,6 +34,7 @@
 
 static bool less (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED);
+static void donation (struct thread *t);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -125,18 +126,26 @@ sema_up (struct semaphore *sema)
 
   ASSERT (sema != NULL);
 
+  if (thread_current ()->before_donate_priority > -1){
+    thread_current ()->priority = thread_current ()->before_donate_priority;
+    thread_current ()->before_donate_priority = -1;
+  }
+  // printf("%s pr %d\n",thread_current ()->name,thread_current ()->priority );
+      // thread_unblock (list_entry (list_pop_front (&sema->waiters),
+      //                           struct thread, elem));
   old_level = intr_disable ();
-
-  // if(thread_current()->before_donate_priority > -1){
-  //   thread_current()->priority = thread_current()->before_donate_priority;
-  //   thread_current()->before_donate_priority = -1;
-  // }
-
   if (!list_empty (&sema->waiters))
-      thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
-    // thread_unblock (list_entry (list_remove (list_max(&sema->waiters,less,NULL)),
+  {
+    struct list_elem *max_elem = list_max (&sema->waiters,less,NULL);
+    struct thread *t = list_entry (max_elem,struct thread,elem);
+    //list_print (&sema->waiters,"waiters");
+    list_remove (max_elem);
+    // printf("in sema UP >> %s and curr %s\n",t->name,thread_current ()->name );
+    thread_unblock(t);
+    // printf("in sema UP >> %s and curr %s\n",t->name,thread_current ()->name );
+    // thread_unblock (list_entry (list_pop_front (&sema->waiters),
     //                             struct thread, elem));
+  }
   sema->value++;
   intr_set_level (old_level);
 }
@@ -217,10 +226,52 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  enum intr_level old_level = intr_disable ();
+  thread_current ()->acquired_lock = lock;
+  donation(thread_current ());
+
+  intr_set_level (old_level);
+  // list_print (&((lock->semaphore).waiters),"wainting list");
   sema_down (&lock->semaphore);
+  // printf("lock holder = %s prr = %d\n", thread_current ()->name,thread_current ()->priority);
+  thread_current ()->acquired_lock = NULL;
   lock->holder = thread_current ();
 }
 
+// static void
+// donation (struct thread *t)
+// {
+//   if (t == NULL || t->acquired_lock == NULL) 
+//     return;
+//   struct thread *lock_holder = t->acquired_lock->holder;
+//   if (lock_holder != NULL && t-> priority > lock_holder->priority)
+//   {
+//     if (lock_holder->before_donate_priority == -1)
+//     {
+//       lock_holder->before_donate_priority = lock_holder->priority;
+//     }
+//     lock_holder->priority = t->priority;
+//   }
+//   donation (lock_holder);
+// }
+
+static void
+donation (struct thread *t)
+{
+  while (t != NULL && t->acquired_lock != NULL)
+  {
+    struct thread *lock_holder = t->acquired_lock->holder;
+    if (lock_holder != NULL && t-> priority > lock_holder->priority)
+    {
+      if (lock_holder->before_donate_priority == -1)
+      {
+        lock_holder->before_donate_priority = lock_holder->priority;
+      }
+      lock_holder->priority = t->priority;
+    }
+    t = lock_holder;
+  }
+}
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
    thread.
@@ -251,9 +302,10 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+  // printf("%s Releasing\n", thread_current ()->name);
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  // list_print (&(&lock->semaphore)->waiters,"lock_release");
 }
 
 /* Returns true if the current thread holds LOCK, false

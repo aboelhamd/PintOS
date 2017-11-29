@@ -545,7 +545,7 @@ list_print (struct list *list,char* name)
   for (e = list_begin (list); e != list_end (list); e = e->next)
   {
     struct thread *t = list_entry(e,struct thread,elem);
-    printf("elem>> %s, ", t->name);
+    printf("elem>> %s pr %d, ", t->name,t->priority);
   }
   printf("\nfinish printing list\n");
 }
