@@ -375,11 +375,32 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+static bool 
+less_locks (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
+{
+  struct lock *lock1 = list_entry(e1,struct lock,elem);
+  struct lock *lock2 = list_entry(e2,struct lock,elem);
+  return (lock1->max_priority < lock2->max_priority); 
+}
+
+void 
+thread_set_max_priority (struct thread *t)
+{
+  struct list_elem *max_elem = list_max (&t->locks,less_locks,NULL);
+  struct lock *lock = list_entry (max_elem,struct lock,elem);
+
+  t->priority = max_elem != list_tail (&t->locks) ? 
+      lock->max_priority : t->org_priority;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  thread_current ()->org_priority = new_priority;
+  //max
+  thread_set_max_priority (thread_current ());
   enum intr_level old_level = intr_disable ();
   struct list_elem *max_elem = list_max (&ready_list,less,NULL);
   struct thread *t = list_entry (max_elem,struct thread,elem);
@@ -393,6 +414,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
+  // printf("ASODFOASDOFOASDFOASDOFOASDFO%d\n",thread_current ()->priority );
   return thread_current ()->priority;
 }
 
@@ -502,6 +524,7 @@ is_thread (struct thread *t)
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
+
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
@@ -515,8 +538,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
+
+  //setting initial priority
   t->priority = priority;
-  t->before_donate_priority = -1;
+  t->org_priority = priority;
+  list_init (&t->locks);
+
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
@@ -645,13 +672,13 @@ bool flage = false;
 static void
 schedule (void) 
 {
-  if(flage){
-    enum thread_status old_status = running_thread ()->status;
-    running_thread ()->status = THREAD_RUNNING;
-    printf("I AM LEAVING \n");
-    debug_backtrace ();
-    running_thread ()->status = old_status;
-  }
+  // if(flage){
+  //   enum thread_status old_status = running_thread ()->status;
+  //   running_thread ()->status = THREAD_RUNNING;
+  //   printf("I AM LEAVING \n");
+  //   debug_backtrace ();
+  //   running_thread ()->status = old_status;
+  // }
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
@@ -661,12 +688,12 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
-  printf("the REAL RUNNING THREAD IS  %s ov %d\n", thread_current ()->name,thread_current ()->priority);
-  if(!strcmp (thread_current ()->name , "acquire2")){
-    flage = 1;
-  }else{
-    flage = 0;
-  }
+  // printf("the REAL RUNNING THREAD IS  %s ov %d\n", thread_current ()->name,thread_current ()->priority);
+  // if(!strcmp (thread_current ()->name , "acquire2")){
+  //   flage = 1;
+  // }else{
+  //   flage = 0;
+  // }
 }
 
 /* Returns a tid to use for a new thread. */

@@ -90,10 +90,11 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority (in case of donation: 
                                             highest priority donated so far). */
-    int before_donate_priority;         /* Priority before donation. */
+    int org_priority;
+    struct list locks;                  /* List of holding locks */
     struct list_elem allelem;           /* List element for all threads list. */
     struct lock* acquired_lock;         /* The Lock which this thread is waiting for.*/
-    
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wake_time;                  /* time in which the sleeping thread will wake*/
@@ -146,5 +147,6 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void thread_set_max_priority (struct thread *);
 
 #endif /* threads/thread.h */
