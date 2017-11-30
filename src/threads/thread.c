@@ -247,6 +247,11 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
+  if (thread_current ()!= idle_thread && thread_current ()->priority < t->priority)
+  {
+    printf("yielding current thread %s to %s\n",thread_current ()->name,t->name);
+    thread_yield ();
+  }
   intr_set_level (old_level);
 }
 
@@ -485,6 +490,32 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+
+/* Sorting threads according their priorities.*/
+static bool 
+less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
+{
+  struct thread *t1 = list_entry(e1,struct thread,elem);
+  struct thread *t2 = list_entry(e2,struct thread,elem);
+  return (t1->priority < t2->priority); 
+}
+
+static struct thread*
+highest_piriority_thread (void)
+{
+  struct list_elem *max_elem = list_max (&ready_list,less,NULL);
+  struct thread *t = list_entry (max_elem,struct thread,elem);
+  enum thread_status old_status = running_thread ()->status;
+  running_thread ()->status = THREAD_RUNNING;
+  list_print (&ready_list,"ready_list");
+  printf("%s will run now and %s is running_thread\n", t->name,running_thread ()->name);
+  running_thread ()->status = old_status;
+  list_remove (max_elem);
+  return t;
+}
+
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -495,8 +526,16 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else{
+    // struct thread *t=list_entry (list_pop_front (&ready_list), struct thread, elem);
+    // enum thread_status c = running_thread ()->status;
+    // running_thread ()->status = THREAD_RUNNING;
+    // printf("%s IS SLEACTED\n", t->name);
+    // running_thread ()->status = c;
+    // // ASSERT (strcmp (t->name,"acquire1"));
+    // return t;
+    return highest_piriority_thread ();
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -566,6 +605,7 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+  printf("%s IS RUNNING\n", thread_name ());
 }
 
 /* Returns a tid to use for a new thread. */

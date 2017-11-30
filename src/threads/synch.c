@@ -64,14 +64,16 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-
+// printf("sema value %d\n",sema->value );
   old_level = intr_disable ();
-  while (sema->value == 0) 
+  // printf("sema value %d\n",sema->value );
+  if (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
       printf("%s is blocking\n",thread_current ()->name );
+      list_push_back (&sema->waiters, &thread_current ()->elem);
+      // printf("%s is blocking\n",thread_current ()->name );
       thread_block ();
-      printf("%s I AM ALI\n",thread_current ()->name );
+      // printf("%s I AM ALI\n",thread_current ()->name );
     }
   sema->value--;
   intr_set_level (old_level);
@@ -116,8 +118,12 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  {
+    struct thread *t= list_entry (list_pop_front (&sema->waiters),
+                                struct thread, elem);
+    // printf("%s IS UNBLOCKING\n", t->name);
+    thread_unblock (t);
+  }
   sema->value++;
   intr_set_level (old_level);
 }
@@ -197,10 +203,12 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-
+  // printf("LOCK HOLDER was %s\n", lock->holder == NULL ? "HAMADA":lock->holder->name);
   sema_down (&lock->semaphore);
-  // printf("%s I AM ALI TANI\n", thread_current ()->name);
   lock->holder = thread_current ();
+  // intr_disable ();
+  // printf("LOCK HOLDER %s now %d\n",lock->holder->name, &lock->semaphore);
+  // intr_enable ();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
