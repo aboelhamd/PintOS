@@ -68,12 +68,12 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
+      printf("I AM BACK %s\n",thread_current ()->name );
     }
   sema->value--;
   intr_set_level (old_level);
@@ -226,16 +226,26 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  enum intr_level old_level = intr_disable ();
+  enum intr_level old_level;
+  old_level = intr_disable ();
   thread_current ()->acquired_lock = lock;
   donation(thread_current ());
-
-  intr_set_level (old_level);
   // list_print (&((lock->semaphore).waiters),"wainting list");
   sema_down (&lock->semaphore);
-  // printf("lock holder = %s prr = %d\n", thread_current ()->name,thread_current ()->priority);
+  // if (!strcmp (thread_current ()->name,"acquire2") 
+  //   && thread_current ()->priority == 33)
+  // {
+  //   // printf("DONE......................\n");
+  //   ASSERT(0);
+  // }
   thread_current ()->acquired_lock = NULL;
   lock->holder = thread_current ();
+  intr_set_level (old_level);
+  // if (!strcmp (thread_current ()->name,"acquire2") && !strcmp (lock->holder->name,"acquire2") 
+  //   && lock->holder->priority == 33)
+  // {
+  //   ASSERT(0);
+  // }
 }
 
 // static void

@@ -645,13 +645,13 @@ bool flage = false;
 static void
 schedule (void) 
 {
-  // if(flage){
-  //   enum thread_status old_status = running_thread ()->status;
-  //   running_thread ()->status = THREAD_RUNNING;
-  //   printf("I AM LEAVING \n");
-  //   debug_backtrace ();
-  //   running_thread ()->status = old_status;
-  // }
+  if(flage){
+    enum thread_status old_status = running_thread ()->status;
+    running_thread ()->status = THREAD_RUNNING;
+    printf("I AM LEAVING \n");
+    debug_backtrace ();
+    running_thread ()->status = old_status;
+  }
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
@@ -661,12 +661,12 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
-  // printf("the REAL RUNNING THREAD IS  %s ov %d\n", thread_current ()->name,thread_current ()->priority);
-  // if(!strcmp (thread_current ()->name , "acquire2")){
-  //   flage = 1;
-  // }else{
-  //   flage = 0;
-  // }
+  printf("the REAL RUNNING THREAD IS  %s ov %d\n", thread_current ()->name,thread_current ()->priority);
+  if(!strcmp (thread_current ()->name , "acquire2")){
+    flage = 1;
+  }else{
+    flage = 0;
+  }
 }
 
 /* Returns a tid to use for a new thread. */
