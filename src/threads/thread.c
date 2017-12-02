@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "threads/fixed-point.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -11,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -74,7 +76,7 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 static bool less (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED);
-
+static void func (struct thread *t , void *AUX UNUSED);
 void
 print_all_threads (void)
 {
@@ -136,13 +138,24 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+static void
+func (struct thread *t , void *AUX UNUSED)
+{
+  int32_t l = convert_to_int_round (t->recent_cpu / 4);
+  // t->priority = PRI_MAX - l - (t->nice *2);
+  // printf("%s has PRIO %d\n",t->name , t->priority );
+}
+
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
-
+  
+  t->recent_cpu++;
+  
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -153,9 +166,13 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
+  {
+    thread_foreach(func, NULL);
     intr_yield_on_return ();
+  }
 }
 
 /* Prints thread statistics. */
@@ -267,16 +284,16 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
-#ifdef DEBUG
+// #ifdef DEBUG
     printf("%s pr = %d is now unblock and the thread_current is %s pr = %d\n"
       ,t->name,t->priority,thread_current ()->name,thread_current ()->priority);
     // print_ready_threads ();
-#endif
+// #endif
   if (thread_current ()!= idle_thread && thread_current ()->priority < t->priority)
   {
-#ifdef DEBUG
+// #ifdef DEBUG
     printf("yielding current thread %s to %s\n",thread_current ()->name,t->name);
-#endif
+// #endif
     thread_yield ();
   }
 
@@ -348,13 +365,13 @@ thread_yield (void)
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
-  // printf("%s is yielding cpu \n", cur->name);
+
   old_level = intr_disable ();
   if (cur != idle_thread) 
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
-  // printf("%s has the cpu\n", thread_current ()->name);
+
   intr_set_level (old_level);
 }
 
@@ -366,7 +383,6 @@ thread_foreach (thread_action_func *func, void *aux)
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
-
   for (e = list_begin (&all_list); e != list_end (&all_list);
        e = list_next (e))
     {
@@ -398,9 +414,14 @@ thread_set_max_priority (struct thread *t)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->org_priority = new_priority;
-  //max
-  thread_set_max_priority (thread_current ());
+  if (!thread_mlfqs)
+  {
+    thread_current ()->org_priority = new_priority;
+    //max
+    thread_set_max_priority (thread_current ());
+  }else {
+    thread_current ()->priority = new_priority;
+  }
   enum intr_level old_level = intr_disable ();
   struct list_elem *max_elem = list_max (&ready_list,less,NULL);
   struct thread *t = list_entry (max_elem,struct thread,elem);
@@ -410,19 +431,35 @@ thread_set_priority (int new_priority)
   intr_set_level (old_level);
 }
 
+bool
+thread_is_idle (struct thread *t)
+{
+  return t == idle_thread;
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  // printf("ASODFOASDOFOASDFOASDOFOASDFO%d\n",thread_current ()->priority );
   return thread_current ()->priority;
+}
+
+/* Returns the current thread's priority. */
+int32_t
+thread_get_ready_size (void) 
+{
+  return list_size (&ready_list);
 }
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice_) 
 {
-  /* Not yet implemented. */
+  thread_current ()->nice = nice_;
+  int priority = 
+    convert_to_int_truncate (subtract_int(-(thread_current ()->recent_cpu / 4) ,
+     (thread_current ()->nice * 2) - PRI_MAX));
+  thread_set_priority (priority);
 }
 
 /* Returns the current thread's nice value. */
@@ -430,7 +467,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -438,7 +475,7 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return convert_to_int_round(timer_load_avg () * 100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -446,7 +483,7 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return convert_to_int_round(thread_current ()->recent_cpu * 100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -541,8 +578,12 @@ init_thread (struct thread *t, const char *name, int priority)
 
   //setting initial priority
   t->priority = priority;
-  t->org_priority = priority;
-  list_init (&t->locks);
+  if (!thread_mlfqs){
+    t->org_priority = priority;
+    list_init (&t->locks);
+  }
+  t->recent_cpu = 0;
+  t->nice = 0;
 
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
@@ -577,13 +618,13 @@ highest_piriority_thread (void)
 {
   struct list_elem *max_elem = list_max (&ready_list,less,NULL);
   struct thread *t = list_entry (max_elem,struct thread,elem);
-#ifdef DEBUG
+// #ifdef DEBUG
   enum thread_status old_status = running_thread ()->status;
   running_thread ()->status = THREAD_RUNNING;
   print_ready_threads ();
   printf("%s will run now and %s is running_thread\n", t->name,running_thread ()->name);
   running_thread ()->status = old_status;
-#endif
+// #endif
   list_remove (max_elem);
   return t;
 }
@@ -607,10 +648,10 @@ next_thread_to_run (void)
     return idle_thread;
   else
   {
-    if (!thread_mlfqs)
+    // if (!thread_mlfqs)
       return highest_piriority_thread ();
-    else
-      return bsd ();
+    // else
+      // return bsd ();
     // return list_entry (list_pop_front (&ready_list), struct thread, elem);
   }
 }

@@ -7,7 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+#include "threads/fixed-point.h"
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -19,6 +19,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
+static int32_t load_avg;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -41,6 +42,8 @@ timer_init (void)
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
   list_init (&sleeping_list);
+
+  load_avg = 0;
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -182,6 +185,22 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
+
+int32_t 
+timer_load_avg (void)
+{
+  return load_avg;
+}
+
+static void
+func (struct thread *t , void *AUX UNUSED)
+{
+  int32_t l = divide (2 * load_avg,add(2 * load_avg, 1));
+  int32_t k = multiply (l,t->recent_cpu);
+  t->recent_cpu = add_int(k, t->nice);
+  // printf("recent cpu %d\n", t->recent_cpu);
+}
+
 
 /* Timer interrupt handler. interupt is disabled.*/
 static void
@@ -189,6 +208,20 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  if(ticks % TIMER_FREQ == 0){
+    int size = thread_get_ready_size ()+1;
+    if (thread_is_idle (thread_current ()))
+    {
+      size--;
+    }
+    load_avg = multiply(convert_frac_to_fixed (59, 60), load_avg) +
+    multiply_int(convert_frac_to_fixed (1, 60), size);
+
+    printf("READY SIZE %d LOAD  %d\n", size,load_avg);
+    thread_foreach(func, NULL);
+  }
+
   if(list_size (&sleeping_list))
   {
     struct list_elem *cur_elem = list_begin (&sleeping_list);

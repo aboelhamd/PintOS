@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "devices/timer.h"
 
 // #define DEBUG
 /* States in a thread's life cycle. */
@@ -98,6 +99,8 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wake_time;                  /* time in which the sleeping thread will wake*/
+    int32_t recent_cpu;
+    int nice;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -116,6 +119,8 @@ extern bool thread_mlfqs;
 /*for debuging purposes*/
 void print_ready_threads (void);
 void print_all_threads (void);
+int32_t thread_get_ready_size(void);
+bool thread_is_idle (struct thread *t);
 
 void thread_init (void);
 void thread_start (void);
