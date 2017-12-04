@@ -112,7 +112,9 @@ timer_sleep (int64_t _ticks)
   old_level = intr_disable ();
   thread_current ()->wake_time = _ticks+start;
   list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
+  // printf("%s will sleep at %lld\n", thread_name (),thread_current ()->wake_time);
   thread_block ();
+  // printf("%s will wake up\n", thread_name ());
   intr_set_level (old_level);
 }
 
@@ -195,8 +197,9 @@ timer_load_avg (void)
 static void
 func (struct thread *t , void *AUX UNUSED)
 {
-  int32_t l = divide (2 * load_avg,add(2 * load_avg, 1));
+  int32_t l = divide (2 * load_avg,add_int(2 * load_avg, 1));
   int32_t k = multiply (l,t->recent_cpu);
+  // printf("L = %d K = %d\n",l,k );
   t->recent_cpu = add_int(k, t->nice);
   // printf("recent cpu %d\n", t->recent_cpu);
 }
@@ -207,8 +210,6 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
-
   if(ticks % TIMER_FREQ == 0){
     int size = thread_get_ready_size ()+1;
     if (thread_is_idle (thread_current ()))
@@ -218,7 +219,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
     load_avg = multiply(convert_frac_to_fixed (59, 60), load_avg) +
     multiply_int(convert_frac_to_fixed (1, 60), size);
 
-    printf("READY SIZE %d LOAD  %d\n", size,load_avg);
+    // print_ready_threads ();
+    // printf("READY SIZE %d LOAD  %d curr %s\n", size,load_avg,thread_name ());
     thread_foreach(func, NULL);
   }
 
@@ -229,12 +231,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
     
     while (cur_thread->wake_time <= ticks)
     {
+      // printf("%s remove from sleep\n",cur_thread->name);
       list_pop_front(&sleeping_list);
       thread_unblock(cur_thread);
       cur_elem = list_begin (&sleeping_list);
       cur_thread = list_entry (cur_elem, struct thread, elem);
     }
   }
+
+  thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
