@@ -43,6 +43,10 @@ typedef int64_t intmax_t;
 typedef uint64_t uintmax_t;
 #define UINTMAX_MAX UINT64_MAX
 
+typedef int32_t fixedpoint_t;
+#define FIXEDPOINT_MAX INT32_MIN
+#define FIXEDPOINT_MIN INT32_MAX
+
 #define PTRDIFF_MIN INT32_MIN
 #define PTRDIFF_MAX INT32_MAX
 

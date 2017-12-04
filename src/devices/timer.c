@@ -7,7 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+#include "threads/fixed-point.h"
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -19,6 +20,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
+static fixedpoint_t load_avg;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -30,6 +32,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/*variable of Alarm Clock Req.*/
+static struct list sleeping_list;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +42,9 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&sleeping_list);
+
+  load_avg = 0;
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +92,31 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+/* Sort threads according their waking time and priorities.*/
+static bool 
+less (const struct list_elem *e1,
+        const struct list_elem *e2,void *aux UNUSED)
+{
+  struct thread *t1 = list_entry(e1,struct thread,elem);
+  struct thread *t2 = list_entry(e2,struct thread,elem);
+  return (t1->wake_time < t2->wake_time) 
+  || ((t1->wake_time == t2->wake_time)&&(t1->priority > t2->priority)); 
+}
+
+/* Sleeps for approximately TICKS timer ticks.*/
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t _ticks) 
 {
   int64_t start = timer_ticks ();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  thread_current ()->wake_time = _ticks+start;
+  list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
+  // printf("%s will sleep at %lld\n", thread_name (),thread_current ()->wake_time);
+  thread_block ();
+  // printf("%s will wake up\n", thread_name ());
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -165,12 +188,58 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
+
+int32_t 
+timer_load_avg (void)
+{
+  return load_avg;
+}
+
+static void
+func (struct thread *t , void *AUX UNUSED)
+{
+  fixedpoint_t l = fixedpoint_divide (2 * load_avg,fixedpoint_add(2 * load_avg, 1));
+  fixedpoint_t k = fixedpoint_multiply (l,t->recent_cpu);
+  // printf("L = %d K = %d\n",l,k );
+  t->recent_cpu = fixedpoint_add(k, t->nice);
+  // printf("recent cpu %d\n", t->recent_cpu);
+}
+
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler. interupt is disabled.*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  if(ticks % TIMER_FREQ == 0){
+    int size = thread_get_ready_size ()+1;
+    if (thread_is_idle (thread_current ()))
+    {
+      size--;
+    }
+    load_avg = fixedpoint_multiply (fixedpoint_convert_frac (59, 60), load_avg) +
+          (fixedpoint_convert_frac (1, 60) * size);
+
+    // print_ready_threads ();
+    // printf("READY SIZE %d LOAD  %d curr %s\n", size,load_avg,thread_name ());
+    thread_foreach(func, NULL);
+  }
+
+  if(list_size (&sleeping_list))
+  {
+    struct list_elem *cur_elem = list_begin (&sleeping_list);
+    struct thread *cur_thread = list_entry (cur_elem, struct thread, elem);
+    
+    while (cur_thread->wake_time <= ticks)
+    {
+      // printf("%s remove from sleep\n",cur_thread->name);
+      list_pop_front(&sleeping_list);
+      thread_unblock(cur_thread);
+      cur_elem = list_begin (&sleeping_list);
+      cur_thread = list_entry (cur_elem, struct thread, elem);
+    }
+  }
+
   thread_tick ();
 }
 
