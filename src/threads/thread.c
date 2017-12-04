@@ -4,7 +4,6 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
-#include "threads/fixed-point.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -12,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -139,7 +139,7 @@ thread_start (void)
 static void
 func (struct thread *t , void *AUX UNUSED)
 {
-  int32_t l = convert_to_int_round (t->recent_cpu / 4);
+  int32_t l = fixedpoint_convert_to_int_round (t->recent_cpu / 4);
   int priority = PRI_MAX - l - (t->nice *2);
   if (priority < PRI_MIN)
   {
@@ -161,7 +161,7 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
   
-  t->recent_cpu = add_int (t->recent_cpu,1);
+  t->recent_cpu = fixedpoint_add (t->recent_cpu,1);
   
   /* Update statistics. */
   if (t == idle_thread)
@@ -467,7 +467,7 @@ void
 thread_set_nice (int nice_) 
 {
   thread_current ()->nice = nice_;
-  int32_t l = convert_to_int_round (thread_current ()->recent_cpu / 4);
+  int32_t l = fixedpoint_convert_to_int_round (thread_current ()->recent_cpu / 4);
   int priority = PRI_MAX - l - (thread_current ()->nice *2);
   if (priority < PRI_MIN)
   {
@@ -493,7 +493,7 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return convert_to_int_round(timer_load_avg () * 100);
+  return fixedpoint_convert_to_int_round(timer_load_avg () * 100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -501,7 +501,7 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return convert_to_int_round(thread_current ()->recent_cpu * 100);
+  return fixedpoint_convert_to_int_round(thread_current ()->recent_cpu * 100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.

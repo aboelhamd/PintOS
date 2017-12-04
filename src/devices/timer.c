@@ -8,6 +8,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/fixed-point.h"
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -19,7 +20,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
-static int32_t load_avg;
+static fixedpoint_t load_avg;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -197,10 +198,10 @@ timer_load_avg (void)
 static void
 func (struct thread *t , void *AUX UNUSED)
 {
-  int32_t l = divide (2 * load_avg,add_int(2 * load_avg, 1));
-  int32_t k = multiply (l,t->recent_cpu);
+  fixedpoint_t l = fixedpoint_divide (2 * load_avg,fixedpoint_add(2 * load_avg, 1));
+  fixedpoint_t k = fixedpoint_multiply (l,t->recent_cpu);
   // printf("L = %d K = %d\n",l,k );
-  t->recent_cpu = add_int(k, t->nice);
+  t->recent_cpu = fixedpoint_add(k, t->nice);
   // printf("recent cpu %d\n", t->recent_cpu);
 }
 
@@ -216,8 +217,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
     {
       size--;
     }
-    load_avg = multiply(convert_frac_to_fixed (59, 60), load_avg) +
-    multiply_int(convert_frac_to_fixed (1, 60), size);
+    load_avg = fixedpoint_multiply (fixedpoint_convert_frac (59, 60), load_avg) +
+          (fixedpoint_convert_frac (1, 60) * size);
 
     // print_ready_threads ();
     // printf("READY SIZE %d LOAD  %d curr %s\n", size,load_avg,thread_name ());

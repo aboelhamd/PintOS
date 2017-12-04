@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "devices/timer.h"
 
+
 // #define DEBUG
 /* States in a thread's life cycle. */
 enum thread_status
@@ -99,7 +100,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wake_time;                  /* time in which the sleeping thread will wake*/
-    int32_t recent_cpu;
+    fixedpoint_t recent_cpu;
     int nice;
 
 #ifdef USERPROG
