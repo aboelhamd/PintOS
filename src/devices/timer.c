@@ -211,7 +211,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  if(ticks % TIMER_FREQ == 0){
+  if (thread_mlfqs && ticks % TIMER_FREQ == 0){
     int size = thread_get_ready_size ()+1;
     if (thread_is_idle (thread_current ()))
     {

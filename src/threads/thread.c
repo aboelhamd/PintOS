@@ -161,7 +161,8 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
   
-  t->recent_cpu = fixedpoint_add (t->recent_cpu,1);
+  if(thread_mlfqs)
+    t->recent_cpu = fixedpoint_add (t->recent_cpu,1);
   
   /* Update statistics. */
   if (t == idle_thread)
@@ -177,8 +178,9 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
   {
-    // printf("%s ALIII\n",thread_name ());
-    thread_foreach(func, NULL);
+    if(thread_mlfqs)
+      thread_foreach(func, NULL);
+    // printf("%s is YEYYEYEYEYEEYEYYEEY\n",thread_name () );
     intr_yield_on_return ();
   }
 }
@@ -347,7 +349,7 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  // printf("%s is exit\n",thread_current()->name );
+  printf("%s is exit\n",thread_current()->name );
   ASSERT (!intr_context ());
 #ifdef USERPROG
   process_exit ();
@@ -640,7 +642,7 @@ highest_piriority_thread (void)
   enum thread_status old_status = running_thread ()->status;
   running_thread ()->status = THREAD_RUNNING;
   print_ready_threads ();
-  printf("%s will run now and %s is running_thread\n", t->name,running_thread ()->name);
+  printf("%s will run now %d and %s is running_thread %d\n", t->name,t->priority,running_thread ()->name,running_thread ()->priority);
   running_thread ()->status = old_status;
 #endif
   list_remove (max_elem);

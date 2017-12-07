@@ -38,8 +38,10 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  printf("I AM IN PROCESS EXE\n");
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -54,6 +56,7 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+      printf("ANA FE PROCESS1 \n" );
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -61,11 +64,11 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+      printf("ANA FE PROCESS \n" );
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
     thread_exit ();
-
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -86,9 +89,12 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait(tid_t child_tid)
 {
-  return -1;
+  while(true)
+  {
+   thread_yield();
+  }
 }
 
 /* Free the current process's resources. */
@@ -195,7 +201,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp,char *argv[],int argc);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -221,8 +227,27 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  printf("LOAD JEASEFASDf85\n");
+    /* Make a copy of FILE_NAME.
+     Otherwise there's a race between the caller and load(). */
+  // char *fn_copy;
+
+  // strlcpy (fn_copy, file_name, PGSIZE);
+  char *token, *save_ptr;
+   char *argv[100];
+   // argv = calloc(100,100);
+   int argc=0;
+   for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr)){
+    argv [argc] = token;
+    printf("%s Token %d is %s\n",token,argc, argv[argc]);
+    argc++;
+   }
+   argv[argc]=NULL;
+   printf("Before Open\n");
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
+  printf("After open\n");
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -302,8 +327,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp,argv,argc)){
+    printf("ALI SETUP\n");
     goto done;
+  }
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -427,7 +454,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp,char *argv[],int argc) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -436,8 +463,38 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
+        void **pointers;
+        pointers = malloc (1000);
+        int margin_size = 0;
+        for (int i = argc-1 ; i >= 0;i--){
+          int size = strlen (argv[i])+1;
+          *esp -= size;
+          memcpy (*esp, argv[i]+'\0', size);
+          margin_size += size%4;
+          *(pointers+i) = *esp;
+          printf("the pointer value of %p %p\n",*esp,*(pointers+i) );
+        }
+        *esp = *esp - 4 + margin_size%4;
+        memset (*esp,0,4 - margin_size);
+        *esp -= 4;
+        memset (*esp , 0 ,4);
+        for (int i = argc-1; i >= 0;i--){
+          *esp -= 4;
+          memcpy  (*esp,(pointers+i),4);
+        }
+        memcpy (*esp-4 , esp, sizeof (char **));//argv
+        *esp -= 4;
+        
+        *esp -= 4;
+        memset (*esp , argc , 1);
+        *esp -= 4;
+        memset (*esp , 0, 4);
+
+        printf("ANA AHASDNFASDFMSADFASD\n");
+        hex_dump((uintptr_t)*esp, *esp, sizeof(char) * 32, true);
+      }
       else
         palloc_free_page (kpage);
     }
