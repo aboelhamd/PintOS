@@ -1,0 +1,292 @@
+			+--------------------+
+			|        CS 140      |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Omar Ahmed Kassem 42
+Ali Ramadan 40
+Aboelhamd Aly 5
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+None.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+None.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+A variable of type list to hold sleeping threads:
+    static struct list sleeping_list;
+
+Added to struct thread:
+    int64_t wake_time;       /* Time in which the sleeping thread will wake. */
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+timer_sleep() disable interrupt to add the current thread
+- which called timer_sleep() - to the sleeping threads list
+maintaining their order then block it, lastly return the old 
+level of interrupt.
+timer_interrupt() check every tick if there are threads to be woken.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+The list of sleeping threads is sorted by the less waking time 
+(remaining time to be woken) and higher priorities. So we don't have
+to iterate through the whole list , but only the threads to be woken.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+timer_sleep() disables interrupt to avoid race conditions.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+Since timer_sleep() disables interrupt , so timer_interrupt() cannot be
+called during a call to timer_sleep().
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+This design allowed as to freely handle the sleeping list in easier way
+than handling it in the semaphore (Sorting the list).
+It has not a great difference in avoiding race conditions , because both
+designs work with disabling interrupt.
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+Added to struct thread:
+    int org_priority;            /* Original (first or new setted) priority. */
+    struct list locks;           /* List of holding locks. */
+    struct lock* acquired_lock;  /* Lock which this thread is waiting for.*/
+
+Added to struct lock:
+    struct list_elem elem;      /* List element to be able to add it to a list. */
+    int max_priority;           /* Maximum priority donated on this lock. */
+
+Added to struct semaphore:
+    struct thread *curr_thread;  /* The max priority thread holing the semaphore */
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+Thread has its original priority and a list of holding locks , each lock has the 
+maximum donated priority. Threads priority is the maximum of all the locks max pririty
+and its own original priority.
+**there is an image included with the document.
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+Semaphore has a list of waiting threads , the max priority thread is poped in sema_up()
+and wakes up. Lock depends on a semaphore.
+Condition variable has a list of semaphores , the max priority thread is the max
+of each semaphore's max priority thread.  
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+The interrupt is disabled , donation takes place , thread downs semaphore
+of the lock , when thread wakes up it holds the lock , lock's max priority 
+is setted to its holder (current thread) priority which has the max priority
+of all the aqcuiring threads , the lock is pushed in the thread's list and 
+at last old interrupt level is returned. 
+
+Nested donation is done when a thread donates its priority to holder of the
+the lock it aquires , then this holder do the same with the thread holds
+the lock it aquires , etc. 
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+The lock is removed from the current thread list , thread's priority is
+recalculated , thread ups the locks semaphore making the highest priority
+thread waiting in the list holds the lock.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+A potential race can happen in choosing the max priority thread from ready list
+to compare its priority with the new priority of current thread , where the 
+time slice of the current thread may be over then a change in the ready list may
+happen causing the race.
+
+We disable the interrupt directly before choosing the max priority priority and
+return its old level after comparing the two threads.
+
+No , synchronization primitives including locks cannot be used to avoid a potetial
+race in a synchronization between threads and interrupt handler. There are many
+cases where a race can occur , one of which is that when the current thread 
+chooses the max priority thread from ready list and its time slice is over then ,
+the scheduler will make the same max priority thread to run , when it exits and 
+hence the current thread returns to compare its priority with the former max 
+priority thread , a page fault rises because this former thread exited before.
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+We choose this design because it works in nested donation , multiple donation
+and nested multiple donation. It's more efficient and simple than our previous
+designs. Each thread has a list of pointers of locks it holds , where each 
+lock of these holds the max priority of threads that acquire and hence wait for
+it (donors). To calculate the holder thread current priority we just choose the 
+max from its original priority and priorities these locks has. We recalculate
+the priority at differrent cases and functions , some of which is at thread set 
+priority , when the holder thread releases the lock and when a new thread acquires
+the lock.
+Another designs such as making the thread contains an array of donating priorities
+was a real mess , besides that it didn't work in multiple donation. 
+
+			  ADVANCED SCHEDULER
+			  ==================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+Added to struct thread:
+    fixedpoint_t recent_cpu;		/* Recent cpu usage. */
+    int nice;				/* Nice value. */
+
+A 'typedf' to represent the fixed point:
+    typedef int32_t fixedpoint_t;
+
+A static variable of type fixedpoint to hold the system load average ,
+which is updated every second : 
+    static fixedpoint_t load_avg;
+
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0     0   0   0   63  61  59     A
+ 4     4   0   0   62  61  59     A
+ 8     8   0   0   61  61  59     B
+12     8   4   0   61  60  59     A
+16    12   4   0   60  60  59     B
+20    12   8   0   60  59  59     A
+24    16   8   0   59  59  59     C
+28    16   8   4   59  59  58     B
+32    16  12   4   59  58  58     A
+36    20  12   4   58  58  58     C
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+
+>yes, there is an ambiguities happened in the scheduler specification because
+in some timer ticks all threads has the same priority.
+>we use round roubin role to resolve that issue.
+>yes, Our scheduler chooses the first maximum priority thread in the ready list.
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+We minimize lines of codes inside the interrupt context , so that the 
+iterrupt handler interrupts the current thread and run scheduler and
+hence the performance is improved.
+
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+Advantages: Our Desgin is improving the memory and time complextiy like for 
+example when we built a list to add all acquired locks for every thread we
+delete that lock when the thread release it to save space and for saving time
+we use list not an array to save time in deleting.
+Disadvantages: We don't handle the case if a thread dies after donating (waiting)
+on a lock in which the donated value for the lock holder should be changed,so i
+think if we have time we will handle that case.   
+
+>> C6: The assignment explains arithmetic for fixed-point math in
+>> detail, but it leaves it open to you to implement it.  Why did you
+>> decide to implement it the way you did?  If you created an
+>> abstraction layer for fixed-point math, that is, an abstract data
+>> type and/or a set of functions or macros to manipulate fixed-point
+>> numbers, why did you do so?  If not, why not?
+
+Although the assignment left it open for the implementation , we decided to 
+just implement it as the assignment explains it , we implement 17.14 fixed-point
+number representation with just the required operations. We decide to do so
+because we understand that explanation and we did not need to edit it .
+
+For the sake of simplicity , abstraction , readability and coding standards , we
+decide to add an abstract data type for fixed-point , and to add a set of functions
+to manipanipulate fixed-point numbers.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?

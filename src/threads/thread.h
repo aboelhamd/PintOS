@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include "devices/timer.h"
 
-
-// #define DEBUG
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -92,16 +90,16 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority (in case of donation: 
                                             highest priority donated so far). */
-    int org_priority;
-    struct list locks;                  /* List of holding locks */
+    int org_priority;                   /* Original (first or new setted) priority. */
+    struct list locks;                  /* List of holding locks. */
     struct list_elem allelem;           /* List element for all threads list. */
-    struct lock* acquired_lock;         /* The Lock which this thread is waiting for.*/
+    struct lock* acquired_lock;         /* Lock which this thread is waiting for.*/
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t wake_time;                  /* time in which the sleeping thread will wake*/
-    fixedpoint_t recent_cpu;
-    int nice;
+    int64_t wake_time;                  /* Time in which the sleeping thread will wake. */
+    fixedpoint_t recent_cpu;		/* Recent cpu usage. */
+    int nice;				/* Nice value. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

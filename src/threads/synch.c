@@ -68,6 +68,7 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
+
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
@@ -104,7 +105,8 @@ sema_try_down (struct semaphore *sema)
   return success;
 }
 
-/* Sorting function. */
+/* Is 1st thread's max priority < 2nd thread's max priority.
+   Used in sorting threads' list. */
 static bool 
 less (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED)
@@ -115,7 +117,7 @@ less (const struct list_elem *e1,
 }
 
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
-   and wakes up one thread of those waiting for SEMA, if any.
+   and wakes up the highest priority thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
 void
@@ -217,7 +219,7 @@ lock_acquire (struct lock *lock)
   enum intr_level old_level;
   old_level = intr_disable ();
   
-  //donation
+  /* Donation */
   if (!thread_mlfqs)
   {
     thread_current ()->acquired_lock = lock;
@@ -227,7 +229,7 @@ lock_acquire (struct lock *lock)
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 
-  //holding lock
+  /* Holding lock */
   if (!thread_mlfqs)
   {
     thread_current ()->acquired_lock = NULL;
@@ -238,6 +240,9 @@ lock_acquire (struct lock *lock)
   intr_set_level (old_level);
 }
 
+/* A thread donates its priority to holder of the
+   the lock it aquires , then this holder do the same
+   with the thread holds the lock it aquires , etc. */
 static void
 donation (struct thread *t)
 {
@@ -314,7 +319,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-    struct thread *curr_thread;
+    struct thread *curr_thread;         /* The max priority thread holing the semaphore */
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -366,7 +371,9 @@ cond_wait (struct condition *cond, struct lock *lock)
   lock_acquire (lock);
 }
 
-/* Sorting function. */
+/* Is 1st semaphore's current thread's priority < 
+   2nd semaphore's current thread's priority.
+   Used in sorting semaphores' list. */
 static bool 
 less2 (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED)
@@ -390,7 +397,8 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-
+  
+  /* Signal semaphore with max priority current thread. */
   if (!list_empty (&cond->waiters)) 
   {
     struct list_elem *max_elem = list_max (&cond->waiters,less2,NULL);

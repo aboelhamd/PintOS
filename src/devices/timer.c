@@ -20,6 +20,8 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
+
+/* The system load average , updated every second */ 
 static fixedpoint_t load_avg;
 
 /* Number of loops per timer tick.
@@ -32,18 +34,19 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
-/*variable of Alarm Clock Req.*/
+/* List of waiting threads*/
 static struct list sleeping_list;
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
-   and registers the corresponding interrupt. */
+   and registers the corresponding interrupt. 
+   Initializing the sleeping list and load average */
 void
 timer_init (void) 
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  list_init (&sleeping_list);
 
+  list_init (&sleeping_list);
   load_avg = 0;
 }
 
@@ -92,18 +95,22 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sort threads according their waking time and priorities.*/
+/* Is 1st thread's wake time < 2nd thread's wake time or
+   1st thread's priority > 2nd thread's priority while 
+   having equal wake time. Used in sorting threads' ready list. */
 static bool 
 less (const struct list_elem *e1,
         const struct list_elem *e2,void *aux UNUSED)
 {
   struct thread *t1 = list_entry(e1,struct thread,elem);
   struct thread *t2 = list_entry(e2,struct thread,elem);
+  
   return (t1->wake_time < t2->wake_time) 
-  || ((t1->wake_time == t2->wake_time)&&(t1->priority > t2->priority)); 
+    || ((t1->wake_time == t2->wake_time)&&(t1->priority > t2->priority)); 
 }
 
-/* Sleeps for approximately TICKS timer ticks.*/
+/* Sleeps for approximately TICKS timer ticks.  Interrupts must
+   be turned on. */
 void
 timer_sleep (int64_t _ticks) 
 {
@@ -111,11 +118,14 @@ timer_sleep (int64_t _ticks)
 
   enum intr_level old_level;
   old_level = intr_disable ();
-  thread_current ()->wake_time = _ticks+start;
+  
+  thread_current ()->wake_time = _ticks + start;
+
+  // add the current thread (which called timer_sleep)
+  // to the sleeping threads list by order , then block it .
   list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
-  // printf("%s will sleep at %lld\n", thread_name (),thread_current ()->wake_time);
   thread_block ();
-  // printf("%s will wake up\n", thread_name ());
+ 
   intr_set_level (old_level);
 }
 
@@ -189,42 +199,44 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+/* Return the system load average as fixedpoint type.*/
 int32_t 
 timer_load_avg (void)
 {
   return load_avg;
 }
 
+/* Calculate recent cpu of a thread.*/
 static void
 func (struct thread *t , void *AUX UNUSED)
 {
   fixedpoint_t l = fixedpoint_divide (2 * load_avg,fixedpoint_add(2 * load_avg, 1));
   fixedpoint_t k = fixedpoint_multiply (l,t->recent_cpu);
-  // printf("L = %d K = %d\n",l,k );
   t->recent_cpu = fixedpoint_add(k, t->nice);
-  // printf("recent cpu %d\n", t->recent_cpu);
 }
 
 
-/* Timer interrupt handler. interupt is disabled.*/
+/* Timer interrupt handler. interupt is disabled.
+   Calculate load average and recent cpu.
+   Wake sleeping threads.*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  if(ticks % TIMER_FREQ == 0){
+  
+  if(ticks % TIMER_FREQ == 0 && thread_mlfqs){
     int size = thread_get_ready_size ()+1;
     if (thread_is_idle (thread_current ()))
-    {
       size--;
-    }
+
     load_avg = fixedpoint_multiply (fixedpoint_convert_frac (59, 60), load_avg) +
           (fixedpoint_convert_frac (1, 60) * size);
-
-    // print_ready_threads ();
-    // printf("READY SIZE %d LOAD  %d curr %s\n", size,load_avg,thread_name ());
+    
+    // calculate recent cpu for all threads
     thread_foreach(func, NULL);
   }
-
+  
+  // wake up every thread that's its waking time has come
   if(list_size (&sleeping_list))
   {
     struct list_elem *cur_elem = list_begin (&sleeping_list);
@@ -232,7 +244,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
     
     while (cur_thread->wake_time <= ticks)
     {
-      // printf("%s remove from sleep\n",cur_thread->name);
       list_pop_front(&sleeping_list);
       thread_unblock(cur_thread);
       cur_elem = list_begin (&sleeping_list);
