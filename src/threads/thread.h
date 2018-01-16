@@ -96,6 +96,7 @@ struct thread
     struct list locks;                  /* List of holding locks */
     struct list_elem allelem;           /* List element for all threads list. */
     struct lock* acquired_lock;         /* The Lock which this thread is waiting for.*/
+    struct list fd_table;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

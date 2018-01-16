@@ -79,7 +79,6 @@ lookup_page (uint32_t *pd, const void *vaddr, bool create)
       else
         return NULL;
     }
-
   /* Return the page table entry. */
   pt = pde_get_pt (*pde);
   return &pt[pt_no (vaddr)];

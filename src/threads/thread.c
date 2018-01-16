@@ -351,8 +351,9 @@ thread_exit (void)
 {
   printf("%s is exit\n",thread_current()->name );
   ASSERT (!intr_context ());
+
 #ifdef USERPROG
-  process_exit ();
+  process_exit (0);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -604,6 +605,9 @@ init_thread (struct thread *t, const char *name, int priority)
   }
   t->recent_cpu = 0;
   t->nice = 0;
+
+  //initialize file descriptor table.
+  list_init (&t->fd_table);
 
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
