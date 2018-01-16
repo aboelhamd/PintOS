@@ -155,9 +155,7 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
   // hex_dump((uintptr_t)f->esp, f->esp, sizeof(char) * (PHYS_BASE - f->esp), true);
   if (thread_current ()->pagedir == NULL)
-  {
     return;
-  }
   if (is_user_vaddr (fault_addr))
   {
     void *address = pagedir_get_page (thread_current ()->pagedir , fault_addr);

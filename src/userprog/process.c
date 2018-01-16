@@ -18,6 +18,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
@@ -47,9 +48,17 @@ process_execute (const char *file_name)
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy2);
   palloc_free_page (fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy2); 
+    palloc_free_page (fn_copy2);
+
+  //creating child process.
+  struct child_process *child;
+  memset (child, 0, sizeof *child);
+  child->tid = tid;
+  sema_init (child->sema_child);
+  list_push_back (&thread_current ()->child_list,child->elem);
   return tid;
 }
+
 /* A thread function that loads a user process and starts it
    running. */
 static void
@@ -80,6 +89,21 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+/*  check that the a process waits for any given child at most once 
+    and pid is a direct child of the calling process. */
+static struct child_process*
+get_child (tid_t child_tid)
+{
+  struct list_elem *e;
+  struct list *list = &thread_current ()->child_list;
+  for (e = list_begin (list); e != list_end (list); e = list_next (e))
+  {
+    struct child_process *cp = liste_entry (list,struct child_process,elem);
+    if (cp->tid == child_tid && !cp->parent_iswaiting)
+      return cp;
+  }
+  return NULL;
+}
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -92,8 +116,12 @@ start_process (void *file_name_)
 int
 process_wait(tid_t child_tid)
 {
-  for(;;);
-  return child_tid;
+  struct child_process *child_process = valid_child (child_tid);
+  if (!child_process)
+    return -1;
+  child_process->parent_iswaiting = true;
+  sema_down (&child_process->sema_child);
+  return child_process->exit_state;
 }
 
 /* Free the current process's resources. */
@@ -463,7 +491,7 @@ pass_arguments (void **esp, char *file_name)
   *esp -= 4;
   memset (*esp , 0, 4);
 
-  hex_dump((uintptr_t)*esp, *esp, sizeof(char) * (PHYS_BASE - *esp), true);
+  // hex_dump((uintptr_t)*esp, *esp, sizeof(char) * (PHYS_BASE - *esp), true);
 }
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */

@@ -608,7 +608,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   //initialize file descriptor table.
   list_init (&t->fd_table);
-
+  list_init (&t->child_list);
+  
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);

@@ -33,14 +33,14 @@ static void
 sys_exit (void *esp)
 {
 	int status = *((int *)esp + 1);
-	printf("STATUS %d\n", status);
-	thread_exit ();
+	exit (status);
 }
 
 /* System Call: void exit (int status) */
 static void 
 exit (int status)
 {
+	
 	printf("STATUS %d\n", status);
 	thread_exit ();
 }
@@ -56,15 +56,16 @@ exec (void *esp)
 static int 
 wait (void *esp)
 {
-
+	pid_t pid = (pid_t)*((int*)esp+1);
+	return process_wait (pid);
 }
 
 /* System Call: bool create (const char *file, unsigned initial_size) */
 static bool
 create (void *esp)
 {
-	char* file = (char *)((int*)esp + 1);
-	unsigned initial_size = *((unsigned*)esp + 2);
+	char* file = (char *)((int*)esp + 4);
+	unsigned initial_size = *((unsigned*)esp + 5);
 	printf("file name in create %s initial_size %d\n", file,initial_size);
 	return filesys_create (file,initial_size);
 }
@@ -129,12 +130,14 @@ get_file (int _fd)
 static int 
 write (void *esp)
 {
-	int fd = *((int*)esp + 1);
-	void* buffer = (void *)((int*)esp + 2);
-	unsigned size = (unsigned)*((int*)esp + 3);
-	printf("fd %d buffer address %p , %d\n",fd,buffer,size);
+	int fd = *((int*)esp + 5);
+	void* buffer = (void*)*((int*)esp + 6);
+	unsigned size = (unsigned)*((int*)esp + 7);
+	// printf("before >> fd %d buffer address %p , %d\n",fd,buffer,size);
 	buffer = check_addr (buffer,size);
-	printf("fd %d buffer address %p data %s , %d\n",fd,buffer,buffer ,size);
+	// printf("after >> fd %p buffer address %p data %s , %d\n",&fd,buffer,buffer ,size);
+	  // hex_dump((uintptr_t)esp, esp, 256, true);
+
 	if (fd == STDOUT_FILENO)
 	{
 		putbuf(buffer,size);
@@ -174,7 +177,7 @@ close (void *esp)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  printf ("system call! %p %d\n", f->esp,*(int*)f->esp);
+  // printf ("system call! %p %d\n", f->esp,*(int*)f->esp);
   switch (*(int*)f->esp)
   {
   	case SYS_HALT:				/* Halt the operating system. */
@@ -268,6 +271,5 @@ check_addr (void *addr, unsigned size)
 	void *address = pagedir_get_page (thread_current ()->pagedir , addr);
 	if (address != NULL)
 	  return address;
-
 	exit(-1);
 }
