@@ -10,6 +10,7 @@
 #include "userprog/pagedir.h"
 #define LOWER_LIMITS ((void *) 0x08048000)
 #define STDOUT_FILENO 1
+#define STDIN_FILENO 0
 
 static void syscall_handler (struct intr_frame *);
 static void check_valid_ptr (void *vaddr);
@@ -40,8 +41,9 @@ sys_exit (void *esp)
 static void 
 exit (int status)
 {
-	
 	printf("STATUS %d\n", status);
+	// thread_current ()->child_process->exit_status = status;
+	// sema_up (&thread_current ()->child_process->sema_child);
 	thread_exit ();
 }
 
@@ -49,7 +51,7 @@ exit (int status)
 static pid_t 
 exec (void *esp)
 {
-
+	char *cmd_line = (char*)((int*)esp +1);
 }
 
 /* System Call: int wait (pid_t pid) */
@@ -74,14 +76,7 @@ create (void *esp)
 static bool 
 remove (void *esp)
 {
-
-}
-
-static int
-init_fd (struct file *file)
-{
-
-  return file->fd;
+	char *file = (char*)((int*)esp +1);
 }
 
 /* System Call: int open (const char *file) */
@@ -100,14 +95,16 @@ open (void *esp)
 static int 
 filesize (void *esp)
 {
-
+	int fd = *((int *)esp+1);
 }
 
 /* System Call: int read (int fd, void *buffer, unsigned size) */
 static int 
 read (void *esp)
 {
-
+	int fd = *((int*)esp + 5);
+	void* buffer = (void*)*((int*)esp + 6);
+	unsigned size = (unsigned)*((int*)esp + 7);
 }
 
 static struct file*
@@ -157,21 +154,22 @@ write (void *esp)
 static void 
 seek (void *esp)
 {
-
+	int fd = *((int*)esp + 4);
+	unsigned position = (unsigned)*((int*)esp + 5);
 }
 
 /* System Call: unsigned tell (int fd) */
 static unsigned 
 tell (void *esp)
 {
-
+	int fd = *((int*)esp + 1);
 }
 
 /* System Call: void close (int fd) */
 static void 
 close (void *esp)
 {
-
+	int fd = *((int*)esp + 1);
 }
 
 static void

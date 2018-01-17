@@ -5,7 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "devices/timer.h"
-
+#include "threads/synch.h"
 
 // #define DEBUG
 /* States in a thread's life cycle. */
@@ -26,7 +26,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+  
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -96,7 +96,6 @@ struct thread
     struct list locks;                  /* List of holding locks */
     struct list_elem allelem;           /* List element for all threads list. */
     struct lock* acquired_lock;         /* The Lock which this thread is waiting for.*/
-    struct list fd_table;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -107,12 +106,25 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct list child_list;
+    struct list fd_table;
+    // struct list child_list;
+    // struct child_process *child_process;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+/*  struct for child process.*/
+// struct child_process
+//   {
+//     tid_t tid;                          /* Thread identifier. */
+//     struct thread *parent;
+//     struct list_elem elem;
+//     bool parent_iswaiting;
+//     int exit_status;
+//     struct semaphore sema_child;
+//   };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

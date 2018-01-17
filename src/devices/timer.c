@@ -113,9 +113,7 @@ timer_sleep (int64_t _ticks)
   old_level = intr_disable ();
   thread_current ()->wake_time = _ticks+start;
   list_insert_ordered(&sleeping_list,&thread_current ()->elem,less,NULL);
-  // printf("%s will sleep at %lld\n", thread_name (),thread_current ()->wake_time);
   thread_block ();
-  // printf("%s will wake up\n", thread_name ());
   intr_set_level (old_level);
 }
 

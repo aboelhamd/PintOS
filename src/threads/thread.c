@@ -269,9 +269,6 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-#ifdef DEBUG
-  printf("%s i am blocking\n", thread_current ()->name);
-#endif
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
@@ -349,11 +346,10 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  printf("%s is exit\n",thread_current()->name );
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  process_exit (0);
+  // process_exit (thread_current ()->child_process->exit_status);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -581,8 +577,7 @@ is_thread (struct thread *t)
 {
   return t != NULL && t->magic == THREAD_MAGIC;
 }
-
-
+  
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
@@ -606,10 +601,21 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = 0;
   t->nice = 0;
 
-  //initialize file descriptor table.
+#ifdef USERPROG
   list_init (&t->fd_table);
-  list_init (&t->child_list);
-  
+  // list_init (&t->child_list);
+  // if (initial_thread != running_thread ())
+  // {
+  //   //creating child process.
+  //   struct child_process *child;
+  //   memset (child, 0, sizeof *child);
+  //   sema_init (&child->sema_child,0);
+  //   child->parent = thread_current ();
+  //   t->child_process = child;
+  //   list_push_back (&thread_current ()->child_list,&child->elem);
+  // }
+#endif
+
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
@@ -730,6 +736,12 @@ schedule (void)
 {
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
+  
+  // enum thread_status status = running_thread ()->status;
+  // running_thread ()->status = THREAD_RUNNING;
+  // printf("next to run %s\n",next->name);
+  // running_thread ()->status = status;
+
   struct thread *prev = NULL;
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
