@@ -193,6 +193,21 @@ thread_print_stats (void)
           idle_ticks, kernel_ticks, user_ticks);
 }
 
+static void
+init_process (struct thread* t)
+{
+  list_init (&t->fd_table);
+  list_init (&t->child_list);
+  //creating child process.
+  struct child_process *child;
+  child = palloc_get_page (PAL_ZERO);
+  memset (child, 0, sizeof *child);
+  sema_init (&child->sema_child,0);
+  child->parent = thread_current ();
+  child->tid = t->tid;
+  t->child_process = child;
+  list_push_back (&thread_current ()->child_list,&child->elem);
+}
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
@@ -229,6 +244,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+#ifdef USERPROG
+  init_process (t);
+#endif
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -349,7 +368,7 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  // process_exit (thread_current ()->child_process->exit_status);
+  process_exit (thread_current ()->child_process->exit_status);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -601,20 +620,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = 0;
   t->nice = 0;
 
-#ifdef USERPROG
-  list_init (&t->fd_table);
-  // list_init (&t->child_list);
-  // if (initial_thread != running_thread ())
-  // {
-  //   //creating child process.
-  //   struct child_process *child;
-  //   memset (child, 0, sizeof *child);
-  //   sema_init (&child->sema_child,0);
-  //   child->parent = thread_current ();
-  //   t->child_process = child;
-  //   list_push_back (&thread_current ()->child_list,&child->elem);
-  // }
-#endif
+  if (!strcmp (name,"main"))
+  {
+    list_init (&t->fd_table);
+    list_init (&t->child_list);
+  }
 
   t->acquired_lock = NULL;
   t->magic = THREAD_MAGIC;

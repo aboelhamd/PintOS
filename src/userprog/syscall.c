@@ -22,6 +22,16 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+/* System Call: void exit (int status) */
+static void 
+exit (int status)
+{
+	//printf("STATUS %d\n", status);
+	thread_current ()->child_process->exit_status = status;
+	sema_up (&thread_current ()->child_process->sema_child);
+	thread_exit ();
+}
+
 /* System Call: void halt (void) */
 static void 
 halt (void *esp)
@@ -35,16 +45,6 @@ sys_exit (void *esp)
 {
 	int status = *((int *)esp + 1);
 	exit (status);
-}
-
-/* System Call: void exit (int status) */
-static void 
-exit (int status)
-{
-	printf("STATUS %d\n", status);
-	// thread_current ()->child_process->exit_status = status;
-	// sema_up (&thread_current ()->child_process->sema_child);
-	thread_exit ();
 }
 
 /* System Call: pid_t exec (const char *cmd_line) */
@@ -68,7 +68,7 @@ create (void *esp)
 {
 	char* file = (char *)((int*)esp + 4);
 	unsigned initial_size = *((unsigned*)esp + 5);
-	printf("file name in create %s initial_size %d\n", file,initial_size);
+	//printf("file name in create %s initial_size %d\n", file,initial_size);
 	return filesys_create (file,initial_size);
 }
 
@@ -86,7 +86,7 @@ open (void *esp)
 	char *file_name = (char *)((int*)esp + 1);
 	struct file *new_file = filesys_open (file_name);
 	new_file->fd = 13;
-    printf("file fd = %d\n",new_file->fd );
+    //printf("file fd = %d\n",new_file->fd );
     list_push_back (&thread_current ()->fd_table,&new_file->elem);
 	return new_file->fd;
 }
@@ -115,7 +115,6 @@ get_file (int _fd)
   	for (e = list_begin (list); e != list_end (list); e = list_next (e))
   	{
   		struct file *f = list_entry (e, struct file, elem);
-  		printf("current file fd = %d\n",f->fd);
   		if (f->fd == _fd)
   		{
   			return f;
@@ -127,12 +126,12 @@ get_file (int _fd)
 static int 
 write (void *esp)
 {
-	int fd = *((int*)esp + 5);
-	void* buffer = (void*)*((int*)esp + 6);
-	unsigned size = (unsigned)*((int*)esp + 7);
-	// printf("before >> fd %d buffer address %p , %d\n",fd,buffer,size);
+	int fd = *((int*)esp + 1);
+	void* buffer = (void*)*((int*)esp + 2);
+	unsigned size = (unsigned)*((int*)esp + 3);
+	// //printf("before >> fd %d buffer address %p , %d\n",fd,buffer,size);
 	buffer = check_addr (buffer,size);
-	// printf("after >> fd %p buffer address %p data %s , %d\n",&fd,buffer,buffer ,size);
+	// //printf("after >> fd %p buffer address %p data %s , %d\n",&fd,buffer,buffer ,size);
 	  // hex_dump((uintptr_t)esp, esp, 256, true);
 
 	if (fd == STDOUT_FILENO)
@@ -145,7 +144,7 @@ write (void *esp)
 		struct file *file = get_file (fd);
 		if (!file)
 			return -1;
-		printf("FILE FD = %d\n",file->fd);
+		//printf("FILE FD = %d\n",file->fd);
 		return file_write (file,buffer,size);
 	}
 }
@@ -175,76 +174,76 @@ close (void *esp)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  // printf ("system call! %p %d\n", f->esp,*(int*)f->esp);
+  // //printf ("system call! %p %d\n", f->esp,*(int*)f->esp);
   switch (*(int*)f->esp)
   {
   	case SYS_HALT:				/* Halt the operating system. */
   	{
-  		printf("SYS_ Halt %d\n", SYS_HALT);
+  		//printf("SYS_ Halt %d\n", SYS_HALT);
   		break;
   	}
   	  	case SYS_EXIT:			/* Terminate this process. */
   	{
-  		printf("SYS_ EXIT %d\n", SYS_EXIT);
+  		//printf("SYS_ EXIT %d\n", SYS_EXIT);
   		sys_exit (f->esp);
   		break;
   	}
   	  	case SYS_EXEC:			/* Start another process. */
   	{
-  		printf("SYS_EXEC %d\n", SYS_EXEC);
+  		//printf("SYS_EXEC %d\n", SYS_EXEC);
   		break;
   	}
   	  	case SYS_WAIT:			/* Wait for a child process to die. */
   	{
-  		printf("SYS_WAIT %d\n", SYS_WAIT);
+  		//printf("SYS_WAIT %d\n", SYS_WAIT);
   		break;
   	}
   	  	case SYS_CREATE:		/* Create a file. */
   	{
-  		printf("SYS_CREATE %d\n", SYS_CREATE);
+  		//printf("SYS_CREATE %d\n", SYS_CREATE);
   		f->eax = create (f->esp);
   		break;
   	}
   	  	case SYS_REMOVE:		/* Delete a file. */
   	{
-  		printf("SYS_REMOVE %d\n", SYS_REMOVE);
+  		//printf("SYS_REMOVE %d\n", SYS_REMOVE);
   		break;
   	}
   	  	case SYS_OPEN:			/* Open a file. */
   	{
-  		printf("SYS_OPEN %d\n", SYS_OPEN);
+  		//printf("SYS_OPEN %d\n", SYS_OPEN);
   		break;
   	}
   	  	case SYS_FILESIZE:		/* Obtain a file's size. */
   	{
-  		printf("SYS_FILESIZE %d\n", SYS_FILESIZE);
+  		//printf("SYS_FILESIZE %d\n", SYS_FILESIZE);
   		break;
   	}
   	  	case SYS_READ:			/* Read from a file. */
   	{
-  		printf("SYS_READ %d\n", SYS_READ);
+  		//printf("SYS_READ %d\n", SYS_READ);
   		break;
   	}
   	  	case SYS_WRITE:			/* Write to a file. */
   	{
-  		printf("SYS_WRITE %d\n", SYS_WRITE);
-  		// printf("%d\n", *(int*)(f->esp));
+  		//printf("SYS_WRITE %d\n", SYS_WRITE);
+  		// //printf("%d\n", *(int*)(f->esp));
   		f->eax = write (f->esp);
   		break;
   	}
   	  	case SYS_SEEK:			/* Change position in a file. */
   	{
-  		printf("SYS_SEEK %d\n", SYS_SEEK);
+  		//printf("SYS_SEEK %d\n", SYS_SEEK);
   		break;
   	}
   	  	case SYS_TELL:			/* Report current position in a file. */
   	{
-  		printf("SYS_TELL %d\n", SYS_TELL);
+  		//printf("SYS_TELL %d\n", SYS_TELL);
   		break;
   	}
   	  	case SYS_CLOSE:			/* Close a file. */
   	{
-  		printf("SYS_CLOSE %d\n", SYS_CLOSE);
+  		//printf("SYS_CLOSE %d\n", SYS_CLOSE);
   		break;
   	}
   }

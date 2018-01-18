@@ -230,9 +230,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
     
     while (cur_thread->wake_time <= ticks)
     {
-      // printf("%s remove from sleep\n",cur_thread->name);
       list_pop_front(&sleeping_list);
       thread_unblock(cur_thread);
+      if (list_empty (&sleeping_list))
+        break;
       cur_elem = list_begin (&sleeping_list);
       cur_thread = list_entry (cur_elem, struct thread, elem);
     }

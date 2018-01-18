@@ -107,8 +107,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct list fd_table;
-    // struct list child_list;
-    // struct child_process *child_process;
+    struct list child_list;
+    struct child_process *child_process;
 #endif
 
     /* Owned by thread.c. */
@@ -116,15 +116,15 @@ struct thread
   };
 
 /*  struct for child process.*/
-// struct child_process
-//   {
-//     tid_t tid;                          /* Thread identifier. */
-//     struct thread *parent;
-//     struct list_elem elem;
-//     bool parent_iswaiting;
-//     int exit_status;
-//     struct semaphore sema_child;
-//   };
+struct child_process
+  {
+    tid_t tid;                          /* Thread identifier. */
+    struct thread *parent;
+    struct list_elem elem;
+    bool parent_iswaiting;
+    int exit_status;
+    struct semaphore sema_child;
+  };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

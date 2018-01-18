@@ -82,22 +82,21 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
-// /*  check that the a process waits for any given child at most once 
-//     and pid is a direct child of the calling process. */
-// static struct child_process*
-// get_child (tid_t child_tid)
-// {
-//   struct list_elem *e;
-//   // struct list *list = &thread_current ()->child_list;
-//   struct list *list;
-//   for (e = list_begin (list); e != list_end (list); e = list_next (e))
-//   {
-//     struct child_process *cp = list_entry (e, struct child_process, elem);
-//     if (cp->tid == child_tid && !cp->parent_iswaiting)
-//       return cp;
-//   }
-//   return NULL;
-// }
+/*  check that the a process waits for any given child at most once 
+    and pid is a direct child of the calling process. */
+static struct child_process*
+get_child (tid_t child_tid)
+{
+  struct list_elem *e;
+  struct list *list = &thread_current ()->child_list;
+  for (e = list_begin (list); e != list_end (list); e = list_next (e))
+  {
+    struct child_process *cp = list_entry (e, struct child_process, elem);
+    if (cp->tid == child_tid && !cp->parent_iswaiting)
+      return cp;
+  }
+  return NULL;
+}
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -110,13 +109,12 @@ start_process (void *file_name_)
 int
 process_wait(tid_t child_tid)
 {
-  // struct child_process *child_process = get_child (child_tid);
-  // if (!child_process)
-  //   return -1;
-  // child_process->parent_iswaiting = true;
-  // sema_down (&child_process->sema_child);
-  // return child_process->exit_status;
-  return 1;
+  struct child_process *child_process = get_child (child_tid);
+  if (!child_process)
+    return -1;
+  child_process->parent_iswaiting = true;
+  sema_down (&child_process->sema_child);
+  return child_process->exit_status;
 }
 
 /* Free the current process's resources. */
