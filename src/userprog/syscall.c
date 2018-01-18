@@ -66,8 +66,8 @@ wait (void *esp)
 static bool
 create (void *esp)
 {
-	char* file = (char *)((int*)esp + 4);
-	unsigned initial_size = *((unsigned*)esp + 5);
+	char* file = (char *)((int*)esp + 1);
+	unsigned initial_size = *((unsigned*)esp + 2);
 	printf("file name in create %s initial_size %d\n", file,initial_size);
 	return filesys_create (file,initial_size);
 }
