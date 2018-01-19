@@ -60,6 +60,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+struct list executable_files_list;
 
 static void kernel_thread (thread_func *, void *aux);
 static void idle (void *aux UNUSED);
@@ -78,9 +79,7 @@ static void func (struct thread *t , void *AUX UNUSED);
 void
 print_all_threads (void)
 {
-#ifdef DEBUG
   all_list_print (&all_list,"all_list");
-#endif
 }
 
 void
@@ -193,6 +192,19 @@ thread_print_stats (void)
           idle_ticks, kernel_ticks, user_ticks);
 }
 
+bool
+is_executable_file (char* efile_name)
+{
+  struct list_elem *e;
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = e->next)
+  {
+    struct thread *t = list_entry(e,struct thread,allelem);
+    if (!strcmp (t->name , efile_name))
+      return true;
+  }
+  return false;
+}
+
 static void
 init_process (struct thread* t)
 {
@@ -200,9 +212,10 @@ init_process (struct thread* t)
   list_init (&t->child_list);
   //creating child process.
   struct child_process *child;
-  child = palloc_get_page (PAL_ZERO);
+  child = palloc_get_page (PAL_USER);
   memset (child, 0, sizeof *child);
   sema_init (&child->sema_child,0);
+  sema_init (&child->sync,0);
   child->parent = thread_current ();
   child->tid = t->tid;
   t->child_process = child;
@@ -746,11 +759,6 @@ schedule (void)
 {
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
-  
-  // enum thread_status status = running_thread ()->status;
-  // running_thread ()->status = THREAD_RUNNING;
-  // printf("next to run %s\n",next->name);
-  // running_thread ()->status = status;
 
   struct thread *prev = NULL;
   ASSERT (intr_get_level () == INTR_OFF);

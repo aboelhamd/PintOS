@@ -9,15 +9,16 @@ struct inode;
 /* An open file. */
 struct file 
   {
+  	char* file_name;
     struct inode *inode;        /* File's inode. */
     off_t pos;                  /* Current position. */
     bool deny_write;            /* Has file_deny_write() been called? */
-    int fd;                     /* Unique File Descriptor. */
+    int fd;                		/* Unique File Descriptor. */
     struct list_elem elem;      /* elem.............. */
   };
 
 /* Opening and closing files. */
-struct file *file_open (struct inode *);
+struct file *file_open (struct inode *,char *file_name) ;
 struct file *file_reopen (struct file *);
 void file_close (struct file *);
 struct inode *file_get_inode (struct file *);

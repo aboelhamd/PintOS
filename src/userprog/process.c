@@ -36,7 +36,7 @@ process_execute (const char *file_name)
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   fn_copy2 = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL || fn_copy2 == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -69,9 +69,21 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
   if (!success)
+  {
+    thread_current ()->child_process->tid = -1;
+    thread_current ()->child_process->exit_status = -1;
+    printf("load: %s: open failed\n", file_name);
+    palloc_free_page (file_name);
+    sema_up (&thread_current ()->child_process->sync);
     thread_exit ();
+  }
+  else
+  {
+    // add_executable_file (file_name);
+    sema_up (&thread_current ()->child_process->sync);
+  }
+  palloc_free_page (file_name);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -254,7 +266,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   file = filesys_open (thread_current ()->name);
   if (file == NULL) 
     goto done; 
-
+  
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)

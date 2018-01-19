@@ -180,6 +180,7 @@ struct list_elem *list_min (struct list *, list_less_func *, void *aux);
 
 /*debuging */
 void list_print (struct list *list,char* name);
+void list_print2 (struct list *list,char* name);
 void all_list_print (struct list* list,char* name);
 
 #endif /* lib/kernel/list.h */

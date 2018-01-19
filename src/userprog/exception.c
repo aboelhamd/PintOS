@@ -159,12 +159,17 @@ page_fault (struct intr_frame *f)
   if (is_user_vaddr (fault_addr))
   {
     void *address = pagedir_get_page (thread_current ()->pagedir , fault_addr);
-    if (address != NULL)
+    if (address)
     {
       fault_addr = address;
       return;
     }
+    else
+      exit (-1);
   }
+  else if (fault_addr == PHYS_BASE)
+    exit (-1);
+  
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",

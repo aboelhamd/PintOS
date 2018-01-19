@@ -124,6 +124,7 @@ struct child_process
     bool parent_iswaiting;
     int exit_status;
     struct semaphore sema_child;
+    struct semaphore sync;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -168,5 +169,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 void thread_set_max_priority (struct thread *);
+
+/* for controlling exe files.*/
+bool is_executable_file (char* efile_name);
 
 #endif /* threads/thread.h */

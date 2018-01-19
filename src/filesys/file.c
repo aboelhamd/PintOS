@@ -9,7 +9,7 @@
    and returns the new file.  Returns a null pointer if an
    allocation fails or if INODE is null. */
 struct file *
-file_open (struct inode *inode) 
+file_open (struct inode *inode ,char *file_name) 
 {
   struct file *file = calloc (1, sizeof *file);
   if (inode != NULL && file != NULL)
@@ -17,6 +17,7 @@ file_open (struct inode *inode)
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
+      file->file_name = file_name;
       return file;
     }
   else
@@ -32,7 +33,7 @@ file_open (struct inode *inode)
 struct file *
 file_reopen (struct file *file) 
 {
-  return file_open (inode_reopen (file->inode));
+  return file_open (inode_reopen (file->inode), file->file_name);
 }
 
 /* Closes FILE. */
