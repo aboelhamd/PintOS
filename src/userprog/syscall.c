@@ -8,6 +8,8 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "threads/synch.h"
+
 #define LOWER_LIMITS ((void *) 0x08048000)
 #define STDOUT_FILENO 1
 #define STDIN_FILENO 0
@@ -16,11 +18,13 @@
 static void syscall_handler (struct intr_frame *);
 static void check_valid_ptr (void *vaddr);
 static void* check_addr (void *addr, unsigned size);
+struct lock sync;
 
 void
 syscall_init (void) 
 {
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+	lock_init (&sync);
+  	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static struct file*
@@ -85,9 +89,11 @@ get_child (tid_t child_tid)
 static pid_t 
 exec (const char *cmd_line) 
 {
+	lock_acquire (&sync);
 	cmd_line = check_addr (cmd_line,1);
 	tid_t id = process_execute (cmd_line);
 	struct child_process *child_process = get_child (id);
+	lock_release (&sync);
 	sema_down (&child_process->sync);
 	return child_process->tid;
 }
@@ -108,14 +114,20 @@ create (const char *file, unsigned initial_size)
 	if (!file)
 		exit (-1);
 	file = check_addr (file,1);
-	return filesys_create (file,initial_size);
+	lock_acquire (&sync);
+	bool ans = filesys_create (file, initial_size);
+	lock_release (&sync);
+	return ans;
 }
 
 /* System Call: bool remove (const char *file) */
 static bool 
 remove (const char *file)
 {
-	return filesys_remove (file);
+	lock_acquire (&sync);
+	bool ans = filesys_remove (file);
+	lock_release (&sync);
+	return ans;
 }
 
 static int
@@ -138,7 +150,9 @@ open (const char *file)
 	if(!file)
 		exit (-1);
 	file = check_addr (file, 1);
+	lock_acquire (&sync);
 	struct file *new_file = filesys_open (file);
+	lock_release (&sync);
 	if (!new_file)
 		return -1;
 	new_file->fd = get_fd ();
@@ -171,8 +185,10 @@ read (int fd, void *buffer, unsigned size)
 		struct file *f = get_file (fd);
 		if (!f)
 			exit (-1);
-		int i = file_read (f, buffer ,size);
-		    return i;
+		lock_acquire (&sync);
+		int ans = file_read (f, buffer ,size);
+		lock_release (&sync);
+		return ans;
 	}
 }
 
@@ -193,7 +209,10 @@ write (int fd, const void *buffer, unsigned size)
 			return ERROR;
 		if (is_executable_file (file->file_name))
 			return 0;
- 		return file_write (file,buffer,size);
+		lock_acquire (&sync);
+		int ans = file_write (file,buffer,size);
+		lock_release (&sync);
+ 		return ans;
 	}
 }
 
@@ -219,7 +238,9 @@ close (int fd)
 	if (!file)
 		exit (-1);
 	list_remove (&file->elem);
+	lock_acquire (&sync);
 	file_close (file);
+	lock_release (&sync);
 }
 
 static void 
