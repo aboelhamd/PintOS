@@ -119,7 +119,6 @@ struct thread
 struct child_process
   {
     tid_t tid;                          /* Thread identifier. */
-    struct thread *parent;
     struct list_elem elem;
     bool parent_iswaiting;
     int exit_status;

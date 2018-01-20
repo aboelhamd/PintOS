@@ -205,21 +205,24 @@ is_executable_file (char* efile_name)
   return false;
 }
 
-static void
+static tid_t
 init_process (struct thread* t)
 {
   list_init (&t->fd_table);
   list_init (&t->child_list);
   //creating child process.
   struct child_process *child;
-  child = palloc_get_page (PAL_USER);
+  child = palloc_get_page (PAL_ZERO);
+  // if (!child){
+  //   return TID_ERROR;
+  // }
   memset (child, 0, sizeof *child);
   sema_init (&child->sema_child,0);
   sema_init (&child->sync,0);
-  child->parent = thread_current ();
   child->tid = t->tid;
   t->child_process = child;
   list_push_back (&thread_current ()->child_list,&child->elem);
+  return t->tid;
 }
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
@@ -259,7 +262,7 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
 
 #ifdef USERPROG
-  init_process (t);
+  tid = t->tid = init_process (t);
 #endif
 
   /* Prepare thread for first run by initializing its stack.

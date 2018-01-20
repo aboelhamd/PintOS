@@ -48,17 +48,7 @@ void
 exit (int status)
 {
 	thread_current ()->child_process->exit_status = status;
-	//closing opend files.
-	// struct list_elem *e;
-	// struct list *list = &thread_current ()->fd_table;
- //  	for (e = list_begin (list); e != list_end (list); e = list_next (e))
- //  	{
- //  		struct file *f = list_entry (e, struct file, elem);
- //  		file_close (f);
- //  	}
-	// file_close (thread_current ()->name);
 	sema_up (&thread_current ()->child_process->sema_child);
-	// list_remove (&thread_current ()->child_process->elem);
 	thread_exit ();
 }
 
@@ -89,21 +79,28 @@ get_child (tid_t child_tid)
 static pid_t 
 exec (const char *cmd_line) 
 {
-	lock_acquire (&sync);
 	cmd_line = check_addr (cmd_line,1);
+	lock_acquire (&sync);
 	tid_t id = process_execute (cmd_line);
-	struct child_process *child_process = get_child (id);
 	lock_release (&sync);
-	sema_down (&child_process->sync);
-	return child_process->tid;
+	// Failed to execute child.
+	if (id == TID_ERROR){
+		return TID_ERROR;
+	}
+	else
+	{
+		struct child_process *child_process = get_child (id);
+		sema_down (&child_process->sync);
+		return child_process->tid;
+	}
 }
 
 /* System Call: int wait (pid_t pid) */
 static int 
 wait (pid_t pid)
 {
-	int child_exit_status =  process_wait (pid);
-	// list_remove (&get_child (pid)->elem);
+	int child_exit_status = process_wait (pid);
+	free (get_child (pid));
 	return child_exit_status;
 }
 

@@ -46,8 +46,9 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy2);
   palloc_free_page (fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy2);
+  }
 
   return tid;
 }
@@ -109,6 +110,7 @@ get_child (tid_t child_tid)
   }
   return NULL;
 }
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -122,11 +124,24 @@ int
 process_wait(tid_t child_tid)
 {
   struct child_process *child_process = get_child (child_tid);
-  if (!child_process)
+  if (!child_process){
     return -1;
+  }
   child_process->parent_iswaiting = true;
   sema_down (&child_process->sema_child);
   return child_process->exit_status;
+}
+
+static void 
+close_all_files (struct list* files)
+{
+  struct list_elem *e;
+  while(!list_empty(files))
+  {
+    e = list_pop_front(files);
+    struct file *f = list_entry (e, struct file, elem);
+    file_close(f);
+  }
 }
 
 /* Free the current process's resources. */
@@ -151,6 +166,7 @@ process_exit (int exit_code)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      close_all_files (&thread_current ()->fd_table);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
